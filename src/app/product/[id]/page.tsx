@@ -68,19 +68,25 @@ export default function ProductDetails() {
 
   const onTouchMove = (e: React.TouchEvent) => {
     touchEnd.current = e.targetTouches[0].clientX;
+    // Optional: prevent vertical scroll if horizontal swipe is intentional
+    const yDiff = Math.abs(e.targetTouches[0].clientY - (touchStart.current || 0));
+    const xDiff = Math.abs(e.targetTouches[0].clientX - (touchStart.current || 0));
+    if (xDiff > yDiff && xDiff > 10) {
+      // It's a horizontal swipe, prevent default to stop page shake
+    }
   };
 
   const onTouchEnd = () => {
     if (!touchStart.current || !touchEnd.current) return;
     const distance = touchStart.current - touchEnd.current;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
+    const isLeftSwipe = distance > 40;
+    const isRightSwipe = distance < -40;
     if (isLeftSwipe) nextImg();
     if (isRightSwipe) prevImg();
   };
 
   return (
-    <div className="app-layout">
+    <div className="app-layout" style={{ overflowX: "hidden", maxWidth: "100vw", position: "relative" }}>
       {/* Shared Header */}
       <header className="header" style={{ position: "sticky", top: 0, zIndex: 1000, background: "var(--header-bg)", borderBottom: "1px solid var(--border)" }}>
         <div className="container header-container">
@@ -112,10 +118,10 @@ export default function ProductDetails() {
         </div>
       </header>
 
-      <main className="container" style={{ padding: "1.5rem" }}>
+      <main className="container" style={{ padding: "1rem", boxSizing: "border-box", overflowX: "hidden" }}>
         <button 
           onClick={() => router.back()} 
-          style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", color: "var(--text-secondary)", background: "none", border: "none", font: "inherit" }}
+          style={{ marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", color: "var(--text-secondary)", background: "none", border: "none", font: "inherit", padding: 0 }}
         >
           &larr; Назад
         </button>
@@ -280,10 +286,32 @@ export default function ProductDetails() {
         }
 
         @media (max-width: 768px) {
-          .product-details-grid { grid-template-columns: 1fr; gap: 1.5rem; }
-          .main-image-container { height: 350px; }
-          .product-name { font-size: 1.5rem; }
-          .nav-arrow { width: 44px; height: 44px; background: rgba(255,255,255,0.8); box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          .product-details-grid { 
+            grid-template-columns: 1fr; 
+            gap: 1.5rem; 
+            width: 100%;
+            margin: 0;
+            padding: 0 0.5rem;
+            box-sizing: border-box;
+          }
+          .main-image-container { 
+            height: 320px; 
+            width: 100%;
+            box-sizing: border-box;
+          }
+          .product-name { font-size: 1.6rem; }
+          .nav-arrow { 
+            width: 44px; 
+            height: 44px; 
+            background: rgba(255,255,255,0.9); 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            opacity: 1 !important;
+          }
+          .info-section {
+            padding: 0;
+            width: 100%;
+            box-sizing: border-box;
+          }
         }
       `}</style>
     </div>
