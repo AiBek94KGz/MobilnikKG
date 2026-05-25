@@ -234,6 +234,19 @@ export default function Storefront() {
   const [authMethod, setAuthMethod] = useState<null | "google" | "telegram">(null);
   const [authInputValue, setAuthInputValue] = useState("");
 
+  useEffect(() => {
+    // Handle successful Telegram Auth redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    const authSuccess = urlParams.get("auth_success");
+    const tgUsername = urlParams.get("username");
+
+    if (authSuccess === "true" && tgUsername) {
+      store.loginTelegram(tgUsername);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [store]);
+
   // Theme State local toggle handler
   const [theme, setThemeState] = useState<"dark" | "light">("dark");
 
@@ -818,39 +831,27 @@ export default function Storefront() {
               )}
 
               {authMethod === "telegram" && (
-                <form onSubmit={(e) => {
-                  e.preventDefault();
-                  if (authInputValue.trim()) {
-                    store.loginTelegram(authInputValue.trim());
-                  }
-                }}>
-                  <div className="form-group" style={{ marginBottom: "1rem" }}>
-                    <label htmlFor="tg-input" style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                      Введите ваш Telegram Username:
-                    </label>
-                    <input
-                      type="text"
-                      id="tg-input"
-                      className="form-input"
-                      placeholder="@alex_owner, @maria_admin, @mobistore_opt"
-                      value={authInputValue}
-                      onChange={(e) => setAuthInputValue(e.target.value)}
-                      required
-                      autoFocus
-                    />
-                    <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "6px", display: "block" }}>
-                      Симуляция Telegram Widget. Роль определится из БД. Попробуйте <code>@alex_owner</code> или <code>@mobistore_opt</code>.
-                    </span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                  <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", textAlign: "center" }}>
+                    Нажмите на кнопку ниже, чтобы авторизоваться через ваш Telegram аккаунт.
+                  </p>
+                  
+                  {/* Real Telegram Login Widget */}
+                  <div id="telegram-login-container">
+                    <script 
+                      async 
+                      src="https://telegram.org/js/telegram-widget.js?22" 
+                      data-telegram-login="MobilnikKGBot" 
+                      data-size="large" 
+                      data-auth-url="/api/auth/telegram-callback" 
+                      data-request-access="write"
+                    ></script>
                   </div>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--border)", background: "transparent", color: "var(--text-primary)", cursor: "pointer" }} onClick={() => { setAuthMethod(null); setAuthInputValue(""); }}>
-                      Назад
-                    </button>
-                    <button type="submit" className="btn-submit" style={{ flex: 1, marginTop: 0, padding: "0.5rem" }}>
-                      Войти
-                    </button>
-                  </div>
-                </form>
+
+                  <button type="button" className="btn-secondary" style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--border)", background: "transparent", color: "var(--text-primary)", cursor: "pointer" }} onClick={() => { setAuthMethod(null); setAuthInputValue(""); }}>
+                    Назад
+                  </button>
+                </div>
               )}
             </>
           )}
