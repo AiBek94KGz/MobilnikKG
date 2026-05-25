@@ -118,7 +118,24 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 64px;
+  height: auto;
+  min-height: 64px;
+  flex-wrap: wrap;
+  padding: 0.75rem 1.5rem;
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .header-container {
+    justify-content: center;
+    padding: 1rem;
+  }
+  .controls-group {
+    justify-content: center;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
 }
 
 .logo {

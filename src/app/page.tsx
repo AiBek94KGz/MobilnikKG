@@ -383,18 +383,18 @@ export default function Storefront() {
               )}
             </button>
 
-            {/* Language dropdown */}
-            <select className="select-custom" value={store.language} onChange={(e) => store.setLanguage(e.target.value as any)}>
+            {/* Language dropdown - Hidden as requested */}
+            {/* <select className="select-custom" value={store.language} onChange={(e) => store.setLanguage(e.target.value as any)}>
               <option value="ru">RU</option>
               <option value="en">EN</option>
               <option value="kg">KG</option>
               <option value="uz">UZ</option>
-            </select>
+            </select> */}
 
-            {/* USD/KGS toggle */}
+            {/* USD/KGS toggle - Swapped order: USD | SOM */}
             <div className="currency-toggle">
-              <div className={`currency-btn ${store.currency === "KGS" ? "active" : ""}`} onClick={() => store.setCurrency("KGS")}>сом</div>
               <div className={`currency-btn ${store.currency === "USD" ? "active" : ""}`} onClick={() => store.setCurrency("USD")}>USD</div>
+              <div className={`currency-btn ${store.currency === "KGS" ? "active" : ""}`} onClick={() => store.setCurrency("KGS")}>сом</div>
             </div>
 
             {/* Cart Button */}
@@ -403,15 +403,17 @@ export default function Storefront() {
               {store.cartCount > 0 && <span className="badge">{store.cartCount}</span>}
             </button>
 
-            {/* User Profile */}
-            <div className="user-badge" onClick={() => store.setAuthOpen(true)}>
-              <div className="user-avatar">
+            {/* User Profile - Better Login Label */}
+            <div className="user-badge" onClick={() => store.setAuthOpen(true)} style={{ padding: "0.5rem 0.75rem", borderRadius: "8px", background: "var(--card)", border: "1px solid var(--border)", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <div className="user-avatar" style={{ width: "24px", height: "24px", fontSize: "0.75rem" }}>
                 {session?.user?.name ? session.user.name.charAt(0) : "Г"}
               </div>
-              <span>{session?.user?.name || "Гость"}</span>
-              <span className={`status-badge badge-${(session?.user as any)?.role || "client"}`}>
-                {((session?.user as any)?.role || "client").toUpperCase()}
-              </span>
+              <span style={{ fontSize: "0.875rem", fontWeight: 600 }}>{session?.user?.name ? session.user.name.split(" ")[0] : "Войти"}</span>
+              {session?.user && (
+                <span className={`status-badge badge-${(session?.user as any)?.role || "client"}`} style={{ marginLeft: "4px" }}>
+                  {((session?.user as any)?.role || "client").toUpperCase()}
+                </span>
+              )}
             </div>
           </div>
         </div>

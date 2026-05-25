@@ -106,14 +106,25 @@ export default function ProductDetails() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
               )}
             </button>
+
+            {/* USD/KGS toggle - Swapped order: USD | SOM */}
             <div className="currency-toggle">
-              <div className={`currency-btn ${store.currency === "KGS" ? "active" : ""}`} onClick={() => store.setCurrency("KGS")}>сом</div>
               <div className={`currency-btn ${store.currency === "USD" ? "active" : ""}`} onClick={() => store.setCurrency("USD")}>USD</div>
+              <div className={`currency-btn ${store.currency === "KGS" ? "active" : ""}`} onClick={() => store.setCurrency("KGS")}>сом</div>
             </div>
+
             <button className="icon-btn" onClick={() => { router.push("/"); setTimeout(() => store.setCartOpen(true), 100); }}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
               {store.cartCount > 0 && <span className="badge">{store.cartCount}</span>}
             </button>
+
+            {/* User Profile - Better Login Label */}
+            <div className="user-badge" onClick={() => { router.push("/"); setTimeout(() => store.setAuthOpen(true), 100); }} style={{ padding: "0.5rem 0.75rem", borderRadius: "8px", background: "var(--card)", border: "1px solid var(--border)", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <div className="user-avatar" style={{ width: "24px", height: "24px", fontSize: "0.75rem" }}>
+                {session?.user?.name ? session.user.name.charAt(0) : "Г"}
+              </div>
+              <span style={{ fontSize: "0.875rem", fontWeight: 600 }}>{session?.user?.name ? session.user.name.split(" ")[0] : "Войти"}</span>
+            </div>
           </div>
         </div>
       </header>
