@@ -247,6 +247,23 @@ export default function Storefront() {
     }
   }, [store]);
 
+  useEffect(() => {
+    // Dynamically load Telegram Widget when authMethod is 'telegram'
+    if (authMethod === "telegram") {
+      const container = document.getElementById("telegram-login-container");
+      if (container && container.innerHTML === "") {
+        const script = document.createElement("script");
+        script.src = "https://telegram.org/js/telegram-widget.js?22";
+        script.async = true;
+        script.setAttribute("data-telegram-login", "MobilnikKGBot");
+        script.setAttribute("data-size", "large");
+        script.setAttribute("data-auth-url", window.location.origin + "/api/auth/telegram-callback");
+        script.setAttribute("data-request-access", "write");
+        container.appendChild(script);
+      }
+    }
+  }, [authMethod]);
+
   // Theme State local toggle handler
   const [theme, setThemeState] = useState<"dark" | "light">("dark");
 
@@ -837,16 +854,7 @@ export default function Storefront() {
                   </p>
                   
                   {/* Real Telegram Login Widget */}
-                  <div id="telegram-login-container">
-                    <script 
-                      async 
-                      src="https://telegram.org/js/telegram-widget.js?22" 
-                      data-telegram-login="MobilnikKGBot" 
-                      data-size="large" 
-                      data-auth-url="/api/auth/telegram-callback" 
-                      data-request-access="write"
-                    ></script>
-                  </div>
+                  <div id="telegram-login-container"></div>
 
                   <button type="button" className="btn-secondary" style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--border)", background: "transparent", color: "var(--text-primary)", cursor: "pointer" }} onClick={() => { setAuthMethod(null); setAuthInputValue(""); }}>
                     Назад
