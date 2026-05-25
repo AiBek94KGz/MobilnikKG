@@ -391,10 +391,10 @@ export default function Storefront() {
               <option value="uz">UZ</option>
             </select> */}
 
-            {/* USD/KGS toggle - Swapped order: USD | SOM */}
+            {/* USD/KGS toggle - Swapped order: SOM | USD */}
             <div className="currency-toggle">
-              <div className={`currency-btn ${store.currency === "USD" ? "active" : ""}`} onClick={() => store.setCurrency("USD")}>USD</div>
               <div className={`currency-btn ${store.currency === "KGS" ? "active" : ""}`} onClick={() => store.setCurrency("KGS")}>сом</div>
+              <div className={`currency-btn ${store.currency === "USD" ? "active" : ""}`} onClick={() => store.setCurrency("USD")}>USD</div>
             </div>
 
             {/* Cart Button */}
@@ -404,16 +404,11 @@ export default function Storefront() {
             </button>
 
             {/* User Profile - Better Login Label */}
-            <div className="user-badge" onClick={() => store.setAuthOpen(true)} style={{ padding: "0.5rem 0.75rem", borderRadius: "8px", background: "var(--card)", border: "1px solid var(--border)", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <div className="user-avatar" style={{ width: "24px", height: "24px", fontSize: "0.75rem" }}>
+            <div className="user-badge" onClick={() => store.setAuthOpen(true)} style={{ padding: "0.6rem 1rem", borderRadius: "8px", background: "var(--accent)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", gap: "0.5rem", boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+              <div className="user-avatar" style={{ width: "24px", height: "24px", fontSize: "0.75rem", background: "rgba(255,255,255,0.2)" }}>
                 {session?.user?.name ? session.user.name.charAt(0) : "Г"}
               </div>
-              <span style={{ fontSize: "0.875rem", fontWeight: 600 }}>{session?.user?.name ? session.user.name.split(" ")[0] : "Войти"}</span>
-              {session?.user && (
-                <span className={`status-badge badge-${(session?.user as any)?.role || "client"}`} style={{ marginLeft: "4px" }}>
-                  {((session?.user as any)?.role || "client").toUpperCase()}
-                </span>
-              )}
+              <span style={{ fontSize: "0.9rem", fontWeight: 700 }}>{session?.user?.name ? session.user.name.split(" ")[0] : "Войти"}</span>
             </div>
           </div>
         </div>
