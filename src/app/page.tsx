@@ -233,36 +233,39 @@ export default function Storefront() {
 
   const [authMethod, setAuthMethod] = useState<null | "google" | "telegram">(null);
   const [authInputValue, setAuthInputValue] = useState("");
+  const [isWaitingTg, setIsWaitingTg] = useState(false);
+  const [tgAuthCode, setTgAuthCode] = useState("");
+
+  const startTgAuth = () => {
+    const code = "AUTH_" + Math.random().toString(36).substring(7).toUpperCase();
+    setTgAuthCode(code);
+    setIsWaitingTg(true);
+    window.open(`https://t.me/MobilnikKGBot?start=${code}`, "_blank");
+  };
 
   useEffect(() => {
-    // Handle successful Telegram Auth redirect
-    const urlParams = new URLSearchParams(window.location.search);
-    const authSuccess = urlParams.get("auth_success");
-    const tgUsername = urlParams.get("username");
-
-    if (authSuccess === "true" && tgUsername) {
-      store.loginTelegram(tgUsername);
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
+    let interval: NodeJS.Timeout;
+    if (isWaitingTg && tgAuthCode) {
+      // Poll API to see if user started the bot with this code
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/auth/tg-poll?code=${tgAuthCode}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.username) {
+              store.loginTelegram(data.username);
+              setIsWaitingTg(false);
+              setAuthMethod(null);
+              clearInterval(interval);
+            }
+          }
+        } catch (e) {
+          console.error("Auth polling failed");
+        }
+      }, 3000);
     }
-  }, [store]);
-
-  useEffect(() => {
-    // Dynamically load Telegram Widget when authMethod is 'telegram'
-    if (authMethod === "telegram") {
-      const container = document.getElementById("telegram-login-container");
-      if (container && container.innerHTML === "") {
-        const script = document.createElement("script");
-        script.src = "https://telegram.org/js/telegram-widget.js?22";
-        script.async = true;
-        script.setAttribute("data-telegram-login", "MobilnikKGBot");
-        script.setAttribute("data-size", "large");
-        script.setAttribute("data-auth-url", window.location.origin + "/api/auth/telegram-callback");
-        script.setAttribute("data-request-access", "write");
-        container.appendChild(script);
-      }
-    }
-  }, [authMethod]);
+    return () => clearInterval(interval);
+  }, [isWaitingTg, tgAuthCode, store]);
 
   // Theme State local toggle handler
   const [theme, setThemeState] = useState<"dark" | "light">("dark");
@@ -865,17 +868,40 @@ export default function Storefront() {
               )}
 
               {authMethod === "telegram" && (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-                  <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", textAlign: "center" }}>
-                    Для авторизации нажмите на кнопку ниже. <br/>
-                    Если видите ошибку <strong>"Bot domain invalid"</strong>, 
-                    обязательно пропишите адрес вашего сайта в <b>@BotFather</b> через команду <code>/setdomain</code>.
-                  </p>
-                  
-                  {/* Real Telegram Login Widget */}
-                  <div id="telegram-login-container" style={{ minHeight: "40px", display: "flex", justifyContent: "center" }}></div>
-
-                  <button type="button" className="btn-secondary" style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--border)", background: "transparent", color: "var(--text-primary)", cursor: "pointer" }} onClick={() => { setAuthMethod(null); setAuthInputValue(""); }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.25rem" }}>
+                  {!isWaitingTg ? (
+                    <>
+                      <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", textAlign: "center", lineHeight: "1.4" }}>
+                        Для входа без ввода пароля нажмите на кнопку ниже, перейдите в Telegram и нажмите <b>СТАРТ</b>.
+                      </p>
+                      <button 
+                        className="btn-submit" 
+                        onClick={startTgAuth} 
+                        style={{ width: "100%", background: "#0088cc", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem" }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.11.02-1.93 1.23-5.46 3.62-.51.35-.98.53-1.39.52-.46-.01-1.33-.26-1.98-.48-.8-.27-1.43-.42-1.37-.89.03-.25.38-.51 1.03-.78 4.04-1.76 6.74-2.92 8.09-3.48 3.85-1.6 4.64-1.88 5.17-1.89.11 0 .37.03.54.17.14.12.18.28.2.45-.02.07-.02.16-.03.22z"/>
+                        </svg>
+                        Открыть нашего бота
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="spinner" style={{ 
+                        border: "3px solid rgba(0,0,0,0.1)", 
+                        borderTop: "3px solid #0088cc", 
+                        borderRadius: "50%", 
+                        width: "32px", 
+                        height: "32px", 
+                        animation: "spin 1s linear infinite" 
+                      }}></div>
+                      <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", textAlign: "center" }}>
+                        Ожидаем подтверждения... <br/>
+                        <b>Нажмите СТАРТ в Telegram</b>
+                      </p>
+                    </>
+                  )}
+                  <button type="button" className="btn-secondary" style={{ width: "100%", padding: "0.5rem" }} onClick={() => { setAuthMethod(null); setIsWaitingTg(false); }}>
                     Назад
                   </button>
                 </div>

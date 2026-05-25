@@ -10,6 +10,8 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   username: text("username").notNull(),
   phone: text("phone"),
+  authCode: text("auth_code"),
+  chatId: text("chat_id"),
   role: text("role", { enum: ["owner", "admin", "wholesale", "client"] }).default("client").notNull(),
   createdAt: text("created_at").default("CURRENT_TIMESTAMP").notNull(),
 });
