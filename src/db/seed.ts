@@ -4,9 +4,12 @@ import { users, products, systemSettings } from "./schema";
 async function main() {
   console.log("🚀 FINAL update: Only 12 new models with FULL localized high-res galleries...");
   
-  await db.delete(products);
-
-  // 1. Settings
+  try {
+    await db.delete(products);
+    console.log("🧹 Old products cleared.");
+  } catch (e) {
+    console.log("⚠️ Products table was already empty or not initialized yet.");
+  }
   await db.insert(systemSettings).values({
     id: 1, usdToKgsRate: 90.0, dubaiShippingCostUsd: 35.0, koreaShippingCostUsd: 30.0,
   }).onConflictDoUpdate({ target: systemSettings.id, set: { usdToKgsRate: 90.0 } });
