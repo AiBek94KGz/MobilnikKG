@@ -391,10 +391,10 @@ export default function Storefront() {
               <option value="uz">UZ</option>
             </select> */}
 
-            {/* USD/KGS toggle - Swapped order: SOM | USD */}
+            {/* USD/KGS toggle - Swapped order: USD | SOM */}
             <div className="currency-toggle">
-              <div className={`currency-btn ${store.currency === "KGS" ? "active" : ""}`} onClick={() => store.setCurrency("KGS")}>сом</div>
               <div className={`currency-btn ${store.currency === "USD" ? "active" : ""}`} onClick={() => store.setCurrency("USD")}>USD</div>
+              <div className={`currency-btn ${store.currency === "KGS" ? "active" : ""}`} onClick={() => store.setCurrency("KGS")}>сом</div>
             </div>
 
             {/* Cart Button */}
