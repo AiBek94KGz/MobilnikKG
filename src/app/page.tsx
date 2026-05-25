@@ -792,15 +792,35 @@ export default function Storefront() {
           {!session?.user && (
             <>
               {authMethod === null && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                  <button className="tg-login-btn" style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#3574f0", color: "#ffffff", padding: "0.75rem", borderRadius: "6px", cursor: "pointer", fontWeight: 500, border: "none" }} onClick={() => { setAuthMethod("telegram"); setAuthInputValue(""); }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: "8px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  {/* TELEGRAM FIRST */}
+                  <button 
+                    className="tg-login-btn" 
+                    style={{ 
+                      display: "flex", alignItems: "center", justifyContent: "center", 
+                      background: "#0088cc", color: "#ffffff", padding: "0.8rem", 
+                      borderRadius: "8px", cursor: "pointer", fontWeight: 600, border: "none" 
+                    }} 
+                    onClick={() => { setAuthMethod("telegram"); setAuthInputValue(""); }}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: "10px" }}>
                       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.11.02-1.93 1.23-5.46 3.62-.51.35-.98.53-1.39.52-.46-.01-1.33-.26-1.98-.48-.8-.27-1.43-.42-1.37-.89.03-.25.38-.51 1.03-.78 4.04-1.76 6.74-2.92 8.09-3.48 3.85-1.6 4.64-1.88 5.17-1.89.11 0 .37.03.54.17.14.12.18.28.2.45-.02.07-.02.16-.03.22z"/>
                     </svg>
                     Войти через Telegram
                   </button>
-                  <button className="google-login-btn" style={{ display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid var(--border)", background: "var(--background)", color: "var(--text-primary)", padding: "0.75rem", borderRadius: "6px", cursor: "pointer", fontWeight: 500 }} onClick={() => { setAuthMethod("google"); setAuthInputValue(""); }}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: "8px" }}>
+
+                  {/* GOOGLE SECOND */}
+                  <button 
+                    className="google-login-btn" 
+                    style={{ 
+                      display: "flex", alignItems: "center", justifyContent: "center", 
+                      border: "1px solid var(--border)", background: "var(--background)", 
+                      color: "var(--text-primary)", padding: "0.8rem", 
+                      borderRadius: "8px", cursor: "pointer", fontWeight: 600 
+                    }} 
+                    onClick={() => { setAuthMethod("google"); setAuthInputValue(""); }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: "10px" }}>
                       <path d="M12.24 10.285V13.4h6.887C18.2 15.614 15.645 18 12.24 18c-3.86 0-7-3.14-7-7s3.14-7 7-7c1.7 0 3.3.65 4.5 1.8l2.4-2.4C17.3 1.7 14.9 1 12.24 1c-5.5 0-10 4.5-10 10s4.5 10 10 10c5.73 0 9.54-4.03 9.54-9.71 0-.66-.08-1.3-.23-1.85a42.92 42.92 0 0 0-9.31-.155z"/>
                     </svg>
                     Войти через Google
@@ -848,10 +868,8 @@ export default function Storefront() {
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
                   <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", textAlign: "center" }}>
                     Для авторизации нажмите на кнопку ниже. <br/>
-                    Если подтверждение не приходит, сначала 
-                    <a href="https://t.me/MobilnikKGBot" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent)", textDecoration: "underline", marginLeft: "4px" }}>
-                      запустите нашего бота
-                    </a>.
+                    Если видите ошибку <strong>"Bot domain invalid"</strong>, 
+                    обязательно пропишите адрес вашего сайта в <b>@BotFather</b> через команду <code>/setdomain</code>.
                   </p>
                   
                   {/* Real Telegram Login Widget */}
