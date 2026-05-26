@@ -768,9 +768,9 @@ export default function Storefront() {
           <div style={{ marginBottom: "1.5rem", fontSize: "0.875rem", color: "var(--text-secondary)", backgroundColor: "var(--background)", padding: "0.75rem", borderRadius: "6px", border: "1px solid var(--border)" }}>
             {session?.user ? (
               <div>
-                <p><strong>Покупатель:</strong> {session.user.name}</p>
-                <p><strong>Email / TG:</strong> {session.user.email}</p>
-                <p><strong>Уровень доступа:</strong> {((session.user as any).role || "client").toUpperCase()}</p>
+                <p><strong>Пользователь:</strong> {session.user.name}</p>
+                <p><strong>ID Индекс:</strong> <code style={{ backgroundColor: "var(--accent)", color: "#fff", padding: "2px 6px", borderRadius: "4px", fontSize: "0.8rem" }}>{(session.user as any).userIndex}</code></p>
+                <p><strong>Уровень:</strong> {((session.user as any).role || "client").toUpperCase()}</p>
                 <button onClick={() => {
                   store.logout();
                   setAuthMethod(null);
@@ -846,6 +846,16 @@ export default function Storefront() {
                     </svg>
                     Войти через Google
                   </button>
+
+                  {/* QUICK TEST LOGIN - Marketplace Platform */}
+                  <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px dashed var(--border)" }}>
+                    <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.5rem", textAlign: "center" }}>БЫСТРЫЙ ВХОД (ПЛАТФОРМА):</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", justifyContent: "center" }}>
+                      <button onClick={() => store.loginTelegram("M4328912312")} style={{ fontSize: "0.65rem", padding: "4px 8px", borderRadius: "4px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", cursor: "pointer" }}>Магазин (M)</button>
+                      <button onClick={() => store.loginTelegram("O775123456")} style={{ fontSize: "0.65rem", padding: "4px 8px", borderRadius: "4px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", cursor: "pointer" }}>Оптовик (O)</button>
+                      <button onClick={() => store.loginTelegram("C995506066")} style={{ fontSize: "0.65rem", padding: "4px 8px", borderRadius: "4px", border: "1px solid var(--border)", background: "rgba(255,255,255,0.05)", cursor: "pointer" }}>Клиент (C)</button>
+                    </div>
+                  </div>
                 </div>
               )}
 

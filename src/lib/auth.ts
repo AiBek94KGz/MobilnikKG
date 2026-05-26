@@ -55,56 +55,52 @@ export const authOptions: NextAuthOptions = {
         if (credentials?.telegram) {
           const tgClean = credentials.telegram.trim().replace("@", "");
           
-          // Lookup user in SQLite database by telegramId or username
+          // Lookup by telegramId, username, OR userIndex
           const found = await db
             .select()
             .from(users)
             .where(eq(users.telegramId, tgClean))
             .limit(1);
 
-          if (found[0]) {
-            const user = found[0];
+          let user = found[0];
+
+          if (!user) {
+            const foundByUsername = await db.select().from(users).where(eq(users.username, tgClean)).limit(1);
+            user = foundByUsername[0];
+          }
+          
+          if (!user) {
+            const foundByIndex = await db.select().from(users).where(eq(users.userIndex, tgClean)).limit(1);
+            user = foundByIndex[0];
+          }
+
+          if (user) {
             return {
               id: user.id.toString(),
               name: user.name,
-              email: user.email || `${user.username}@mobilnik.kg`,
+              email: user.email || `${user.username}@telegram.com`,
               role: user.role,
               username: user.username,
+              userIndex: user.userIndex,
             };
           }
 
-          // Try checking by username
-          const foundByUsername = await db
-            .select()
-            .from(users)
-            .where(eq(users.username, tgClean))
-            .limit(1);
-
-          if (foundByUsername[0]) {
-            const user = foundByUsername[0];
-            return {
-              id: user.id.toString(),
-              name: user.name,
-              email: user.email || `${user.username}@mobilnik.kg`,
-              role: user.role,
-              username: user.username,
-            };
-          }
-
-          // Not found: register new client user with this telegram handle
+          // Not found: register new client user with 'C' index
           const newInserted = await db.insert(users).values({
             name: tgClean,
             username: tgClean,
             telegramId: tgClean,
+            userIndex: `C${tgClean}`, // Auto-generate C-index for new clients
             role: "client",
           }).returning({ id: users.id });
 
           return {
             id: newInserted[0].id.toString(),
             name: tgClean,
-            email: `${tgClean}@mobilnik.kg`,
+            email: `${tgClean}@telegram.com`,
             role: "client",
             username: tgClean,
+            userIndex: `C${tgClean}`,
           };
         }
 
@@ -117,6 +113,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = (user as any).role;
         token.username = (user as any).username;
+        token.userIndex = (user as any).userIndex;
       }
       return token;
     },
@@ -124,6 +121,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).role = token.role;
         (session.user as any).username = token.username;
+        (session.user as any).userIndex = token.userIndex;
       }
       return session;
     },

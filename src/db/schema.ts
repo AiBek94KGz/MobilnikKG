@@ -10,15 +10,16 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   username: text("username").notNull(),
   phone: text("phone"),
-  authCode: text("auth_code"),
-  chatId: text("chat_id"),
-  role: text("role", { enum: ["owner", "admin", "wholesale", "client"] }).default("client").notNull(),
+  userIndex: text("user_index").unique(), // M-ID, O-ID, C-ID
+  role: text("role", { enum: ["owner", "admin", "wholesale", "client", "store_owner", "store_staff"] }).default("client").notNull(),
+  parentId: integer("parent_id"), // For store owners adding staff
   createdAt: text("created_at").default("CURRENT_TIMESTAMP").notNull(),
 });
 
 // 2. Products Table
 export const products = sqliteTable("products", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ownerId: integer("owner_id").references(() => users.id), // Which store/user owns this product
   brand: text("brand", { enum: ["Apple", "Samsung", "Xiaomi", "Feature Phones"] }).notNull(),
   model: text("model").notNull(),
   basePriceUsd: integer("base_price_usd").notNull(),
