@@ -1,0 +1,125 @@
+import { NextResponse } from "next/server";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth";
+
+export async function GET() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const role = (session.user as any).role;
+  if (role !== "store_owner" && role !== "owner" && role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const parentId = parseInt((session.user as any).id, 10);
+    const staffList = await db
+      .select()
+      .from(users)
+      .where(eq(users.parentId, parentId));
+
+    return NextResponse.json({ staff: staffList });
+  } catch (error: any) {
+    console.error("Failed to fetch staff:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const role = (session.user as any).role;
+  if (role !== "store_owner" && role !== "owner" && role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const parentId = parseInt((session.user as any).id, 10);
+    const { name, username, phone } = await request.json();
+
+    if (!name || !username) {
+      return NextResponse.json({ error: "Name and username are required" }, { status: 400 });
+    }
+
+    const cleanUsername = username.trim().replace("@", "");
+
+    // Check if username already exists
+    const exists = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, cleanUsername))
+      .limit(1);
+
+    if (exists[0]) {
+      return NextResponse.json({ error: "Username already exists" }, { status: 400 });
+    }
+
+    const inserted = await db.insert(users).values({
+      name: name.trim(),
+      username: cleanUsername,
+      phone: phone ? phone.trim() : null,
+      role: "store_staff",
+      parentId: parentId,
+      userIndex: `S_${cleanUsername}`,
+    }).returning({ id: users.id });
+
+    return NextResponse.json({ success: true, staffId: inserted[0].id });
+  } catch (error: any) {
+    console.error("Failed to create staff:", error);
+    return NextResponse.json({ error: error.message || "Failed to create staff" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const role = (session.user as any).role;
+  if (role !== "store_owner" && role !== "owner" && role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const idParam = searchParams.get("id");
+    if (!idParam) {
+      return NextResponse.json({ error: "Staff ID is required" }, { status: 400 });
+    }
+
+    const staffId = parseInt(idParam, 10);
+    const parentId = parseInt((session.user as any).id, 10);
+
+    // Verify ownership
+    const staffMember = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, staffId))
+      .limit(1);
+
+    if (!staffMember[0]) {
+      return NextResponse.json({ error: "Staff member not found" }, { status: 404 });
+    }
+
+    // Only owner/admin or the parent store owner can delete
+    if (role !== "owner" && role !== "admin" && staffMember[0].parentId !== parentId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    await db.delete(users).where(eq(users.id, staffId));
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Failed to delete staff:", error);
+    return NextResponse.json({ error: error.message || "Failed to delete staff" }, { status: 500 });
+  }
+}

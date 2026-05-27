@@ -16,6 +16,8 @@ export interface Product {
   statusTag: "all" | "new" | "imported" | "promo";
   imageUrl: string;
   description: string;
+  isActive?: boolean;
+  batteryCapacity?: number | null;
 }
 
 export interface CartItem {

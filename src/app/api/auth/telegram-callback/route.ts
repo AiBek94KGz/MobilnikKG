@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     data[key] = value;
   });
 
-  const botToken = "8985263287:AAE6Kof_fKIT7k8c8FQQBkPc7sEV0ICb0Hs";
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || "8985263287:AAE6Kof_fKIT7k8c8FQQBkPc7sEV0ICb0Hs";
   
   // 1. Verify Telegram Hash
   const { hash, ...authData } = data;

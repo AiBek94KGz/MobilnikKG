@@ -29,6 +29,7 @@ export const products = sqliteTable("products", {
   imageUrl: text("image_url").notNull(), // SVG alias 'apple', 'samsung', 'xiaomi', 'feature'
   description: text("description").notNull(),
   isActive: integer("is_active", { mode: "boolean" }).default(true).notNull(),
+  batteryCapacity: integer("battery_capacity"),
 });
 
 // 3. Orders Table

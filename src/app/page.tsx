@@ -62,6 +62,17 @@ function ProductCard({
   const router = useRouter();
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
   const images = product.imageUrl.split(",");
+  const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    if (images.length <= 1 || isHovered) return;
+
+    const interval = setInterval(() => {
+      setCurrentImgIndex((prev) => (prev + 1) % images.length);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [images.length, isHovered]);
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -83,7 +94,13 @@ function ProductCard({
   const priceLabel = isWholesale ? dict.wholesalePrice : dict.retailPrice;
 
   return (
-    <div className="product-card" onClick={() => router.push(`/product/${product.id}`)} style={{ cursor: "pointer" }}>
+    <div 
+      className="product-card" 
+      onClick={() => router.push(`/product/${product.id}`)} 
+      style={{ cursor: "pointer" }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <div className="product-img-wrapper" style={{ position: "relative", overflow: "hidden" }}>
         {product.statusTag !== "all" && (
           <span className={`product-status-tag tag-${product.statusTag}`}>
@@ -191,21 +208,11 @@ function ProductCard({
       <div className="product-specs">
         <ul className="product-specs-list">
           <li><span>Состояние:</span> <strong>{product.statusTag === "new" ? "Новое" : "Б/У"}</strong></li>
-          <li><span>Остаток:</span> <strong>{product.stockQuantity} ед</strong></li>
-          <li style={{ marginTop: "4px", color: "var(--text-muted)", fontSize: "0.75rem" }}>
-            <span>{priceLabel}</span>
-          </li>
+          {product.brand === "Apple" && product.statusTag === "imported" && product.batteryCapacity && (
+            <li><span>АКБ:</span> <strong>{product.batteryCapacity}%</strong></li>
+          )}
         </ul>
       </div>
-
-      {/* Stock status dot */}
-      {product.stockQuantity > 3 ? (
-        <div className="product-stock stock-ok"><span className="stock-dot"></span>{dict.inStock}</div>
-      ) : product.stockQuantity > 0 ? (
-        <div className="product-stock stock-low"><span className="stock-dot"></span>{dict.lowStock}</div>
-      ) : (
-        <div className="product-stock stock-out"><span className="stock-dot"></span>{dict.outOfStock}</div>
-      )}
 
       <div className="product-footer">
         <div className="product-price">
@@ -231,14 +238,19 @@ export default function Storefront() {
     (((session.user as any).role === "wholesale") ||
       ((session.user as any).role === "owner"));
 
+  const role = session?.user ? (session.user as any).role : null;
+  const isStoreOwner = role === "store_owner";
+  const isPlatformAdmin = role === "owner" || role === "admin";
+
   const [authMethod, setAuthMethod] = useState<null | "google" | "telegram">(null);
   const [authInputValue, setAuthInputValue] = useState("");
 
   useEffect(() => {
     // 1. Define the callback for Telegram in the global window object
     (window as any).onTelegramAuth = (user: any) => {
-      if (user && user.username) {
-        store.loginTelegram(user.username);
+      if (user) {
+        const identifier = user.username || user.id.toString();
+        store.loginTelegram(identifier);
         setAuthMethod(null);
       }
     };
@@ -258,6 +270,24 @@ export default function Storefront() {
       }
     }
   }, [authMethod, store]);
+
+  // 3. Handle redirect callback success parameters from telegram-callback
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const authSuccess = params.get("auth_success");
+      const username = params.get("username");
+      
+      if (authSuccess === "true" && username) {
+        store.loginTelegram(username);
+        // Clean up the URL query parameters
+        const url = new URL(window.location.href);
+        url.searchParams.delete("auth_success");
+        url.searchParams.delete("username");
+        window.history.replaceState({}, document.title, url.pathname + url.search);
+      }
+    }
+  }, [store]);
 
   // Theme State local toggle handler
   const [theme, setThemeState] = useState<"dark" | "light">("dark");
@@ -296,6 +326,428 @@ export default function Storefront() {
     setAdminDubai(store.dubaiCost);
     setAdminKorea(store.koreaCost);
   }, [store.exchangeRate, store.dubaiCost, store.koreaCost]);
+
+  // Admin Add Product form inputs
+  const [newBrand, setNewBrand] = useState<"Apple" | "Samsung" | "Xiaomi" | "Feature Phones">("Apple");
+  const [newModel, setNewModel] = useState("");
+  const [newBasePrice, setNewBasePrice] = useState("");
+  const [newWholesalePrice, setNewWholesalePrice] = useState("");
+  const [newStockQty, setNewStockQty] = useState("");
+  const [newStatusTag, setNewStatusTag] = useState<"all" | "new" | "imported" | "promo">("new");
+  const [newImageUrl, setNewImageUrl] = useState("apple");
+  const [newDescription, setNewDescription] = useState("");
+  const [isSubmittingProduct, setIsSubmittingProduct] = useState(false);
+
+  // New state variables for visibility, battery capacity, and image upload previews
+  const [newIsActive, setNewIsActive] = useState(true);
+  const [newBatteryCapacity, setNewBatteryCapacity] = useState("");
+  const [mediaItems, setMediaItems] = useState<{ id: string; type: "url" | "file"; url: string; file?: File }[]>([]);
+  const [urlInput, setUrlInput] = useState("");
+
+  const handleFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      const newItems = filesArray.map(file => ({
+        id: Math.random().toString(),
+        type: "file" as const,
+        url: URL.createObjectURL(file),
+        file
+      }));
+      setMediaItems(prev => [...prev, ...newItems]);
+    }
+  };
+
+  const handleAddUrlMedia = (urlStr: string) => {
+    if (!urlStr.trim()) return;
+    const items = urlStr.split(",").filter(Boolean).map(img => ({
+      id: Math.random().toString(),
+      type: "url" as const,
+      url: img.trim()
+    }));
+    setMediaItems(prev => [...prev, ...items]);
+  };
+
+  const handleDeleteMedia = (id: string) => {
+    setMediaItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleMoveMedia = (index: number, direction: "left" | "right") => {
+    const nextIndex = direction === "left" ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= mediaItems.length) return;
+    const updated = [...mediaItems];
+    const temp = updated[index];
+    updated[index] = updated[nextIndex];
+    updated[nextIndex] = temp;
+    setMediaItems(updated);
+  };
+
+  const handleRotateMedia = async (id: string) => {
+    const item = mediaItems.find(i => i.id === id);
+    if (!item) return;
+    
+    if (item.type === "url" && !item.url.includes("/") && !item.url.startsWith("data:")) {
+      alert("Невозможно повернуть стандартный логотип бренда.");
+      return;
+    }
+    
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.height;
+      canvas.height = img.width;
+      
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((90 * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      
+      if (item.type === "file" && item.file) {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const rotatedFile = new File([blob], item.file!.name, { type: item.file!.type });
+            setMediaItems(prev => prev.map(m => m.id === id ? {
+              ...m,
+              url: URL.createObjectURL(rotatedFile),
+              file: rotatedFile
+            } : m));
+          }
+        }, item.file.type);
+      } else {
+        try {
+          const rotatedUrl = canvas.toDataURL("image/jpeg");
+          setMediaItems(prev => prev.map(m => m.id === id ? {
+            ...m,
+            url: rotatedUrl
+          } : m));
+        } catch (e) {
+          alert("Не удалось отредактировать это фото.");
+        }
+      }
+    };
+    img.src = item.url;
+  };
+
+  // LK Tab state & listings
+  const [lkTab, setLkTab] = useState<"products" | "staff" | "settings">("products");
+  const [myProducts, setMyProducts] = useState<any[]>([]);
+  const [myStaff, setMyStaff] = useState<any[]>([]);
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
+
+  // Staff form states
+  const [staffName, setStaffName] = useState("");
+  const [staffUsername, setStaffUsername] = useState("");
+  const [staffPhone, setStaffPhone] = useState("");
+  const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
+
+  // Profile settings states
+  const [settingsName, setSettingsName] = useState("");
+  const [settingsUsername, setSettingsUsername] = useState("");
+  const [settingsPhone, setSettingsPhone] = useState("");
+  const [settingsEmail, setSettingsEmail] = useState("");
+  const [isSubmittingSettings, setIsSubmittingSettings] = useState(false);
+
+  useEffect(() => {
+    if (session?.user) {
+      setSettingsName(session.user.name || "");
+      setSettingsUsername((session.user as any).username || "");
+      setSettingsPhone((session.user as any).phone || "");
+      setSettingsEmail(session.user.email || "");
+    }
+  }, [session]);
+
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settingsName.trim() || !settingsUsername.trim()) {
+      alert("Название магазина и юзернейм Telegram обязательны.");
+      return;
+    }
+    setIsSubmittingSettings(true);
+    try {
+      const res = await fetch("/api/store/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: settingsName.trim(),
+          username: settingsUsername.trim(),
+          phone: settingsPhone.trim() || null,
+          email: settingsEmail.trim() || null,
+        }),
+      });
+
+      if (res.ok) {
+        alert("Настройки профиля успешно обновлены!");
+        window.location.reload();
+      } else {
+        const err = await res.json();
+        alert(`Ошибка обновления: ${err.error}`);
+      }
+    } catch (err: any) {
+      alert(`Ошибка сети: ${err.message}`);
+    } finally {
+      setIsSubmittingSettings(false);
+    }
+  };
+
+  // Fetch functions
+  const fetchMyProducts = async () => {
+    try {
+      const res = await fetch("/api/products?owner=mine");
+      if (res.ok) {
+        const data = await res.json();
+        setMyProducts(data.products);
+      }
+    } catch (err) {
+      console.error("Error loading my products:", err);
+    }
+  };
+
+  const fetchMyStaff = async () => {
+    try {
+      const res = await fetch("/api/store/staff");
+      if (res.ok) {
+        const data = await res.json();
+        setMyStaff(data.staff);
+      }
+    } catch (err) {
+      console.error("Error loading my staff:", err);
+    }
+  };
+
+  // Fetch when section changes or store owner logs in
+  useEffect(() => {
+    if (store.section === "admin" && isStoreOwner) {
+      fetchMyProducts();
+      fetchMyStaff();
+    }
+  }, [store.section, isStoreOwner, session]);
+
+  const handleEditClick = (p: any) => {
+    setEditingProduct(p);
+    setNewBrand(p.brand);
+    setNewModel(p.model);
+    setNewBasePrice(p.basePriceUsd.toString());
+    setNewWholesalePrice(p.wholesalePriceUsd.toString());
+    setNewStockQty(p.stockQuantity.toString());
+    setNewStatusTag(p.statusTag);
+    setNewImageUrl(p.imageUrl);
+    setNewDescription(p.description);
+    setNewIsActive(p.isActive !== undefined ? !!p.isActive : true);
+    setNewBatteryCapacity(p.batteryCapacity !== undefined && p.batteryCapacity !== null ? p.batteryCapacity.toString() : "");
+    if (p.imageUrl) {
+      const items = p.imageUrl.split(",").filter(Boolean).map((img: string) => ({
+        id: Math.random().toString(),
+        type: "url" as const,
+        url: img
+      }));
+      setMediaItems(items);
+    } else {
+      setMediaItems([]);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingProduct(null);
+    setNewBrand("Apple");
+    setNewModel("");
+    setNewBasePrice("");
+    setNewWholesalePrice("");
+    setNewStockQty("");
+    setNewStatusTag("new");
+    setNewImageUrl("apple");
+    setNewDescription("");
+    setNewIsActive(true);
+    setNewBatteryCapacity("");
+    setMediaItems([]);
+  };
+
+  const handleDeleteProduct = async (id: number) => {
+    if (!confirm("Вы уверены, что хотите удалить этот товар?")) return;
+    try {
+      const res = await fetch(`/api/products?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        alert("Товар успешно удален.");
+        fetchMyProducts();
+        store.refetchProducts();
+      } else {
+        const err = await res.json();
+        alert(`Ошибка удаления: ${err.error}`);
+      }
+    } catch (err: any) {
+      alert(`Ошибка сети: ${err.message}`);
+    }
+  };
+
+  // Toggle active state of product directly from table
+  const handleToggleProductActive = async (p: any) => {
+    try {
+      const res = await fetch("/api/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p.id, isActive: !p.isActive }),
+      });
+      if (res.ok) {
+        fetchMyProducts();
+        store.refetchProducts();
+      } else {
+        const err = await res.json();
+        alert(`Ошибка изменения активности: ${err.error}`);
+      }
+    } catch (err: any) {
+      alert(`Ошибка сети: ${err.message}`);
+    }
+  };
+
+  // Staff handlers
+  const handleAddStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!staffName.trim() || !staffUsername.trim()) {
+      alert("Заполните имя и юзернейм.");
+      return;
+    }
+    setIsSubmittingStaff(true);
+    try {
+      const res = await fetch("/api/store/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: staffName.trim(),
+          username: staffUsername.trim(),
+          phone: staffPhone.trim() || null,
+        }),
+      });
+
+      if (res.ok) {
+        alert("Сотрудник успешно добавлен!");
+        setStaffName("");
+        setStaffUsername("");
+        setStaffPhone("");
+        fetchMyStaff();
+      } else {
+        const data = await res.json();
+        alert(`Ошибка: ${data.error || "Неизвестная ошибка"}`);
+      }
+    } catch (err: any) {
+      alert(`Ошибка сети: ${err.message}`);
+    } finally {
+      setIsSubmittingStaff(false);
+    }
+  };
+
+  const handleDeleteStaff = async (id: number) => {
+    if (!confirm("Уволить сотрудника?")) return;
+    try {
+      const res = await fetch(`/api/store/staff?id=${id}`, { method: "DELETE" });
+      if (res.ok) {
+        alert("Сотрудник удален.");
+        fetchMyStaff();
+      } else {
+        const err = await res.json();
+        alert(`Ошибка: ${err.error}`);
+      }
+    } catch (err: any) {
+      alert(`Ошибка сети: ${err.message}`);
+    }
+  };
+
+  const handleAddProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newModel.trim() || !newBasePrice || !newWholesalePrice || !newStockQty || !newDescription.trim()) {
+      alert("Пожалуйста, заполните все обязательные поля.");
+      return;
+    }
+
+    setIsSubmittingProduct(true);
+    try {
+      // 1. Upload local images first
+      let finalImageUrl = "";
+      const localFiles = mediaItems.filter(item => item.type === "file" && item.file);
+      
+      if (localFiles.length > 0) {
+        const formData = new FormData();
+        localFiles.forEach(item => {
+          if (item.file) {
+            formData.append("files", item.file);
+          }
+        });
+        
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+        
+        if (!uploadRes.ok) {
+          throw new Error("Не удалось загрузить локальные фотографии на сервер.");
+        }
+        
+        const uploadData = await uploadRes.json();
+        const uploadedUrls = uploadData.urls;
+        
+        let fileIdx = 0;
+        const mappedUrls = mediaItems.map(item => {
+          if (item.type === "file") {
+            const url = uploadedUrls[fileIdx];
+            fileIdx++;
+            return url;
+          }
+          return item.url;
+        });
+        
+        finalImageUrl = mappedUrls.join(",");
+      } else {
+        finalImageUrl = mediaItems.map(item => item.url).join(",");
+      }
+
+      if (!finalImageUrl.trim()) {
+        finalImageUrl = newBrand === "Apple" ? "apple" : (newBrand === "Samsung" ? "samsung" : (newBrand === "Xiaomi" ? "xiaomi" : "feature"));
+      }
+
+      const method = editingProduct ? "PATCH" : "POST";
+      const payload: any = {
+        brand: newBrand,
+        model: newModel.trim(),
+        basePriceUsd: parseInt(newBasePrice, 10),
+        wholesalePriceUsd: parseInt(newWholesalePrice, 10),
+        stockQuantity: parseInt(newStockQty, 10),
+        statusTag: newStatusTag,
+        imageUrl: finalImageUrl,
+        description: newDescription.trim(),
+        isActive: newIsActive,
+        batteryCapacity: (newBrand === "Apple" && newStatusTag === "imported" && newBatteryCapacity) ? parseInt(newBatteryCapacity, 10) : null,
+      };
+
+      if (editingProduct) {
+        payload.id = editingProduct.id;
+      }
+
+      const res = await fetch("/api/products", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        alert(editingProduct ? "Товар успешно обновлен!" : "Товар успешно добавлен!");
+        handleCancelEdit();
+        
+        store.refetchProducts();
+        store.refetchAdminData();
+        if (isStoreOwner) {
+          fetchMyProducts();
+        }
+      } else {
+        const data = await res.json();
+        alert(`Ошибка сохранения товара: ${data.error || "Неизвестная ошибка"}`);
+      }
+    } catch (err: any) {
+      console.error("Failed to save product:", err);
+      alert(`Ошибка сети: ${err.message}`);
+    } finally {
+      setIsSubmittingProduct(false);
+    }
+  };
 
   // Pricing helper
   const renderPrice = (usdVal: number) => {
@@ -360,9 +812,17 @@ export default function Storefront() {
             <div className={`section-tab ${store.section === "preorder" ? "active" : ""}`} onClick={() => store.setSection("preorder")}>
               {dict.navPreOrder}
             </div>
-            {session?.user && ((session.user as any).role === "owner" || (session.user as any).role === "admin") && (
-              <div className={`section-tab ${store.section === "admin" ? "active" : ""}`} style={{ backgroundColor: "var(--danger)", color: "#fff" }} onClick={() => store.setSection("admin")}>
-                Админка
+            {session?.user && (
+              ((session.user as any).role === "owner" || 
+               (session.user as any).role === "admin" || 
+               (session.user as any).role === "store_owner")
+            ) && (
+              <div 
+                className={`section-tab ${store.section === "admin" ? "active" : ""}`} 
+                style={{ backgroundColor: "var(--danger)", color: "#fff" }} 
+                onClick={() => store.setSection("admin")}
+              >
+                {(session.user as any).role === "store_owner" ? "ЛК Магазина" : "Админка"}
               </div>
             )}
           </div>
@@ -403,7 +863,7 @@ export default function Storefront() {
               <div className="user-avatar" style={{ width: "24px", height: "24px", fontSize: "0.75rem", background: "rgba(255,255,255,0.2)" }}>
                 {session?.user?.name ? session.user.name.charAt(0) : "Г"}
               </div>
-              <span style={{ fontSize: "0.9rem", fontWeight: 700 }}>{session?.user?.name ? session.user.name.split(" ")[0] : "Войти"}</span>
+              <span style={{ fontSize: "0.9rem", fontWeight: 700 }}>{session?.user?.name || "Войти"}</span>
             </div>
           </div>
         </div>
@@ -582,111 +1042,567 @@ export default function Storefront() {
         </main>
       )}
 
-      {/* Main Container View: Панель Администратора */}
-      {store.section === "admin" && (
+      {/* Main Container View: Панель Администратора / ЛК Магазина */}
+      {store.section === "admin" && session?.user && (
         <main className="admin-section">
           <div className="container">
             <div className="admin-header-row">
-              <h1>{dict.adminTitle}</h1>
+              <h1>{isStoreOwner ? "Личный кабинет магазина" : dict.adminTitle}</h1>
               <button className="hero-btn" style={{ backgroundColor: "var(--border)", color: "var(--text-primary)" }} onClick={() => store.setSection("instock")}>Вернуться</button>
             </div>
 
             {/* Quick Metrics */}
-            <div className="metrics-row">
-              <div className="metric-box">
-                <div className="metric-title">Сумма всех заказов</div>
-                <div className="metric-val">
-                  ${store.orders.reduce((sum, o) => sum + o.totalUsd, 0).toLocaleString()}
-                </div>
-              </div>
-              <div className="metric-box">
-                <div className="metric-title">Всего заказов</div>
-                <div className="metric-val">{store.orders.length}</div>
-              </div>
-              <div className="metric-box">
-                <div className="metric-title">Активных товаров</div>
-                <div className="metric-val">{store.products.length}</div>
-              </div>
-              <div className="metric-box">
-                <div className="metric-title">Текущий курс</div>
-                <div className="metric-val">{store.exchangeRate} сом</div>
-              </div>
-            </div>
-
-            {/* Settings config form and Orders log table */}
-            <div className="admin-grid">
-              <div className="admin-card">
-                <h3>{dict.adminRecentOrders}</h3>
-                <div className="admin-table-wrapper">
-                  <table className="admin-table">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Покупатель</th>
-                        <th>Товары</th>
-                        <th>Сумма USD</th>
-                        <th>Статус</th>
-                        <th>Тип заказа</th>
-                        <th>Дата</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {store.orders.map(o => (
-                        <tr key={o.id}>
-                          <td>#{o.id}</td>
-                          <td>
-                            <strong>{o.user?.name || "Гость"}</strong>
-                            <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-                              {o.user?.username ? `@${o.user.username}` : ""} | {o.user?.phone || ""}
-                            </div>
-                          </td>
-                          <td>{o.items || "Заказ устройства"}</td>
-                          <td>${o.totalUsd.toLocaleString()}</td>
-                          <td>
-                            <span className={`status-badge badge-${o.status}`}>{o.status}</span>
-                          </td>
-                          <td>
-                            <span className={`status-badge ${o.deliveryType === "pre-order" ? "badge-processing" : "badge-completed"}`}>{o.deliveryType}</span>
-                          </td>
-                          <td>{o.createdAt}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Form editing settings */}
-              <div className="admin-card">
-                <h3>{dict.adminSettings}</h3>
-                <div className="form-group">
-                  <label htmlFor="admin-rate">{dict.adminExchangeRate}</label>
-                  <input type="number" id="admin-rate" className="form-input" step="0.1" value={adminRate} onChange={(e) => setAdminRate(parseFloat(e.target.value) || 0)} />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="admin-dubai">{dict.adminDubaiCost}</label>
-                  <input type="number" id="admin-dubai" className="form-input" value={adminDubai} onChange={(e) => setAdminDubai(parseFloat(e.target.value) || 0)} />
-                </div>
-                <div className="form-group">
-                  <label htmlFor="admin-korea">{dict.adminKoreaCost}</label>
-                  <input type="number" id="admin-korea" className="form-input" value={adminKorea} onChange={(e) => setAdminKorea(parseFloat(e.target.value) || 0)} />
-                </div>
-                <button className="btn-submit" onClick={() => store.saveSettings(adminRate, adminDubai, adminKorea)}>Сохранить</button>
-              </div>
-            </div>
-
-            {/* Telegram console log messages */}
-            <div className="admin-card" style={{ marginTop: "1.5rem" }}>
-              <h3>{dict.adminTgLogs}</h3>
-              <div className="tg-log-console">
-                {store.tgLogs.map(log => (
-                  <div className="tg-log-line" key={log.id}>
-                    <div style={{ color: "#6c707e", marginBottom: "2px" }}>[{log.timestamp}] Hitting API hook dispatch:</div>
-                    <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--font-mono)" }}>{log.payload}</pre>
+            {isPlatformAdmin && (
+              <div className="metrics-row">
+                <div className="metric-box">
+                  <div className="metric-title">Сумма всех заказов</div>
+                  <div className="metric-val">
+                    ${store.orders.reduce((sum, o) => sum + o.totalUsd, 0).toLocaleString()}
                   </div>
-                ))}
+                </div>
+                <div className="metric-box">
+                  <div className="metric-title">Всего заказов</div>
+                  <div className="metric-val">{store.orders.length}</div>
+                </div>
+                <div className="metric-box">
+                  <div className="metric-title">Активных товаров</div>
+                  <div className="metric-val">{store.products.length}</div>
+                </div>
+                <div className="metric-box">
+                  <div className="metric-title">Текущий курс</div>
+                  <div className="metric-val">{store.exchangeRate} сом</div>
+                </div>
               </div>
-            </div>
+            )}
+
+            {isStoreOwner && (
+              <div className="status-pills" style={{ marginBottom: "1.5rem", display: "flex", gap: "0.5rem" }}>
+                <button className={`status-pill ${lkTab === "products" ? "active" : ""}`} onClick={() => setLkTab("products")}>Управление товарами</button>
+                <button className={`status-pill ${lkTab === "staff" ? "active" : ""}`} onClick={() => setLkTab("staff")}>Сотрудники магазина</button>
+                <button className={`status-pill ${lkTab === "settings" ? "active" : ""}`} onClick={() => setLkTab("settings")}>Настройки магазина</button>
+              </div>
+            )}
+
+            {isStoreOwner ? (
+              /* Store Owner View: Switchable tabs for products, staff, and settings */
+              lkTab === "products" ? (
+                <div className="admin-grid" style={{ gridTemplateColumns: "2.5fr 1fr" }}>
+                  {/* Left Card: Products List */}
+                  <div className="admin-card">
+                    <h3>Мои товары</h3>
+                    <div className="admin-table-wrapper">
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Бренд</th>
+                            <th>Модель</th>
+                            <th>Цена ($)</th>
+                            <th>Опт ($)</th>
+                            <th>Кол-во</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {myProducts.map((p) => (
+                            <tr key={p.id} style={{ opacity: p.isActive ? 1 : 0.6 }}>
+                              <td>#{p.id}</td>
+                              <td><strong>{p.brand}</strong></td>
+                              <td>{p.model}</td>
+                              <td>${p.basePriceUsd}</td>
+                              <td>${p.wholesalePriceUsd}</td>
+                              <td>{p.stockQuantity} ед</td>
+                              <td>
+                                <button 
+                                  onClick={() => handleToggleProductActive(p)}
+                                  style={{ 
+                                    fontSize: "0.75rem", 
+                                    padding: "2px 6px", 
+                                    borderRadius: "4px", 
+                                    border: "none", 
+                                    cursor: "pointer",
+                                    backgroundColor: p.isActive ? "var(--success)" : "var(--border)",
+                                    color: "#fff"
+                                  }}
+                                >
+                                  {p.isActive ? "Активен" : "Скрыт"}
+                                </button>
+                              </td>
+                              <td>
+                                <div style={{ display: "flex", gap: "0.5rem" }}>
+                                  <button 
+                                    className="qty-btn" 
+                                    style={{ width: "auto", padding: "0 6px", fontSize: "0.75rem" }} 
+                                    onClick={() => handleEditClick(p)}
+                                  >
+                                    Ред.
+                                  </button>
+                                  <button 
+                                    className="qty-btn" 
+                                    style={{ width: "auto", padding: "0 6px", fontSize: "0.75rem", color: "var(--danger)", borderColor: "var(--danger)" }} 
+                                    onClick={() => handleDeleteProduct(p.id)}
+                                  >
+                                    Удал.
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                          {myProducts.length === 0 && (
+                            <tr>
+                              <td colSpan={8} style={{ textAlign: "center", color: "var(--text-muted)", padding: "2rem" }}>
+                                Нет добавленных товаров.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Right Card: Add/Edit Form */}
+                  <div className="admin-card" style={{ marginBottom: 0 }}>
+                    <h3>{editingProduct ? "Редактировать товар" : "Добавить новый товар"}</h3>
+                    <form onSubmit={handleAddProduct}>
+                      <div className="form-group">
+                        <label htmlFor="prod-brand">Бренд</label>
+                        <select id="prod-brand" className="form-input" value={newBrand} onChange={(e) => setNewBrand(e.target.value as any)}>
+                          <option value="Apple">Apple</option>
+                          <option value="Samsung">Samsung</option>
+                          <option value="Xiaomi">Xiaomi</option>
+                          <option value="Feature Phones">Кнопочные</option>
+                        </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="prod-model">Модель</label>
+                        <input type="text" id="prod-model" className="form-input" placeholder="Galaxy S26 Ultra 512GB" value={newModel} onChange={(e) => setNewModel(e.target.value)} required />
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                        <div className="form-group">
+                          <label htmlFor="prod-price">Цена розн. ($)</label>
+                          <input type="number" id="prod-price" className="form-input" placeholder="1350" value={newBasePrice} onChange={(e) => setNewBasePrice(e.target.value)} required />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="prod-wholesale">Цена опт ($)</label>
+                          <input type="number" id="prod-wholesale" className="form-input" placeholder="1250" value={newWholesalePrice} onChange={(e) => setNewWholesalePrice(e.target.value)} required />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                        <div className="form-group">
+                          <label htmlFor="prod-qty">Количество</label>
+                          <input type="number" id="prod-qty" className="form-input" placeholder="5" value={newStockQty} onChange={(e) => setNewStockQty(e.target.value)} required />
+                        </div>
+                        <div className="form-group">
+                          <label htmlFor="prod-tag">Состояние</label>
+                          <select id="prod-tag" className="form-input" value={newStatusTag} onChange={(e) => setNewStatusTag(e.target.value as any)}>
+                            <option value="all">Без тега</option>
+                            <option value="new">Новое</option>
+                            <option value="imported">Б/У</option>
+                            <option value="promo">Промо</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {newBrand === "Apple" && newStatusTag === "imported" && (
+                        <div className="form-group">
+                          <label htmlFor="prod-battery">Емкость АКБ (%)</label>
+                          <input type="number" id="prod-battery" className="form-input" min="0" max="100" placeholder="85" value={newBatteryCapacity} onChange={(e) => setNewBatteryCapacity(e.target.value)} />
+                        </div>
+                      )}
+
+                      <div className="form-group">
+                        <label>Фотографии товара (первая фото будет обложкой)</label>
+                        
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem", minHeight: mediaItems.length ? "auto" : "50px", padding: "8px", border: "1px dashed var(--border)", borderRadius: "8px", backgroundColor: "rgba(255,255,255,0.02)" }}>
+                          {mediaItems.map((item, idx) => (
+                            <div key={item.id} className="media-preview-container" style={{ position: "relative", width: "80px", height: "80px", border: "1px solid var(--border)", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#fff" }}>
+                              {item.url.startsWith("http") || item.url.startsWith("/") || item.url.startsWith("data:") ? (
+                                <img src={item.url} alt="preview" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                              ) : (
+                                <span style={{ fontSize: "0.75rem", color: "#333", fontWeight: "bold", textTransform: "uppercase" }}>{item.url}</span>
+                              )}
+                              
+                              <div className="media-controls-overlay" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "4px", opacity: 0, transition: "opacity 0.2s" }}>
+                                <button type="button" onClick={() => handleRotateMedia(item.id)} style={{ width: "24px", height: "24px", borderRadius: "4px", border: "none", backgroundColor: "rgba(255,255,255,0.9)", color: "#000", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem" }} title="Повернуть 90°">
+                                  ↻
+                                </button>
+                                {idx > 0 && (
+                                  <button type="button" onClick={() => handleMoveMedia(idx, "left")} style={{ width: "24px", height: "24px", borderRadius: "4px", border: "none", backgroundColor: "rgba(255,255,255,0.9)", color: "#000", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem" }} title="Влево">
+                                    ←
+                                  </button>
+                                )}
+                                {idx < mediaItems.length - 1 && (
+                                  <button type="button" onClick={() => handleMoveMedia(idx, "right")} style={{ width: "24px", height: "24px", borderRadius: "4px", border: "none", backgroundColor: "rgba(255,255,255,0.9)", color: "#000", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem" }} title="Вправо">
+                                    →
+                                  </button>
+                                )}
+                                <button type="button" onClick={() => handleDeleteMedia(item.id)} style={{ width: "24px", height: "24px", borderRadius: "4px", border: "none", backgroundColor: "var(--danger)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem" }} title="Удалить">
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          
+                          <label style={{ width: "80px", height: "80px", border: "2px dashed var(--border)", borderRadius: "6px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-secondary)", fontSize: "1.5rem" }} title="Добавить фото">
+                            +
+                            <span style={{ fontSize: "0.55rem", marginTop: "2px" }}>Выбрать</span>
+                            <input type="file" multiple accept="image/*" onChange={handleFilesChange} style={{ display: "none" }} />
+                          </label>
+                        </div>
+
+                        <style dangerouslySetInnerHTML={{__html: `
+                          .media-preview-container:hover .media-controls-overlay {
+                            opacity: 1 !important;
+                          }
+                        `}} />
+
+                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                          <input type="text" className="form-input" style={{ flex: 1 }} placeholder="Вставить URL или алиас (apple, samsung...)" value={urlInput} onChange={(e) => setUrlInput(e.target.value)} />
+                          <button type="button" className="qty-btn" style={{ width: "auto", padding: "0 12px" }} onClick={() => {
+                            if (urlInput.trim()) {
+                              handleAddUrlMedia(urlInput);
+                              setUrlInput("");
+                            }
+                          }}>Добавить</button>
+                        </div>
+                      </div>
+
+                      <div className="form-group" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: "1rem 0" }}>
+                        <input type="checkbox" id="prod-active" checked={newIsActive} onChange={(e) => setNewIsActive(e.target.checked)} style={{ cursor: "pointer", width: "16px", height: "16px" }} />
+                        <label htmlFor="prod-active" style={{ cursor: "pointer", marginBottom: 0 }}>Показывать товар на сайте</label>
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="prod-desc">Описание</label>
+                        <textarea id="prod-desc" className="form-input" style={{ minHeight: "60px", resize: "vertical", fontFamily: "inherit" }} placeholder="Краткое описание товара..." value={newDescription} onChange={(e) => setNewDescription(e.target.value)} required />
+                      </div>
+
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        {editingProduct && (
+                          <button type="button" className="btn-secondary" style={{ flex: 1, padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--border)", background: "transparent", color: "var(--text-primary)", cursor: "pointer" }} onClick={handleCancelEdit}>
+                            Отмена
+                          </button>
+                        )}
+                        <button type="submit" className="btn-submit" disabled={isSubmittingProduct} style={{ flex: 2, marginTop: 0 }}>
+                          {isSubmittingProduct ? "Сохранение..." : (editingProduct ? "Сохранить" : "Добавить товар")}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              ) : lkTab === "staff" ? (
+                <div className="admin-grid" style={{ gridTemplateColumns: "2.5fr 1fr" }}>
+                  {/* Left Card: Staff List */}
+                  <div className="admin-card">
+                    <h3>Штат сотрудников</h3>
+                    <div className="admin-table-wrapper">
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Имя</th>
+                            <th>Юзернейм Telegram</th>
+                            <th>Телефон</th>
+                            <th>Индекс сотрудника</th>
+                            <th>Действия</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {myStaff.map((s) => (
+                            <tr key={s.id}>
+                              <td>#{s.id}</td>
+                              <td><strong>{s.name}</strong></td>
+                              <td>@{s.username}</td>
+                              <td>{s.phone || "Не указан"}</td>
+                              <td><code style={{ backgroundColor: "var(--accent)", color: "#fff", padding: "2px 6px", borderRadius: "4px", fontSize: "0.8rem" }}>{s.userIndex}</code></td>
+                              <td>
+                                <button 
+                                  className="qty-btn" 
+                                  style={{ width: "auto", padding: "0 8px", fontSize: "0.75rem", color: "var(--danger)", borderColor: "var(--danger)" }} 
+                                  onClick={() => handleDeleteStaff(s.id)}
+                                >
+                                  Уволить
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {myStaff.length === 0 && (
+                            <tr>
+                              <td colSpan={6} style={{ textAlign: "center", color: "var(--text-muted)", padding: "2rem" }}>
+                                Нет добавленных сотрудников.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Right Card: Add Staff Form */}
+                  <div className="admin-card" style={{ marginBottom: 0 }}>
+                    <h3>Добавить сотрудника</h3>
+                    <form onSubmit={handleAddStaff}>
+                      <div className="form-group">
+                        <label htmlFor="staff-name">Имя сотрудника</label>
+                        <input type="text" id="staff-name" className="form-input" placeholder="Иван Петров" value={staffName} onChange={(e) => setStaffName(e.target.value)} required />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="staff-user">Username Telegram (без @)</label>
+                        <input type="text" id="staff-user" className="form-input" placeholder="ivan_tg" value={staffUsername} onChange={(e) => setStaffUsername(e.target.value)} required />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="staff-phone">Номер телефона (необязательно)</label>
+                        <input type="text" id="staff-phone" className="form-input" placeholder="+996555123456" value={staffPhone} onChange={(e) => setStaffPhone(e.target.value)} />
+                      </div>
+
+                      <button type="submit" className="btn-submit" disabled={isSubmittingStaff} style={{ marginTop: "1rem" }}>
+                        {isSubmittingStaff ? "Добавление..." : "Добавить сотрудника"}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              ) : (
+                /* lkTab === "settings" */
+                <div className="admin-grid" style={{ gridTemplateColumns: "1fr" }}>
+                  <div className="admin-card" style={{ maxWidth: "600px", margin: "0 auto", width: "100%" }}>
+                    <h3>Настройки профиля магазина</h3>
+                    <form onSubmit={handleUpdateProfile}>
+                      <div className="form-group">
+                        <label htmlFor="settings-name">Название магазина</label>
+                        <input type="text" id="settings-name" className="form-input" value={settingsName} onChange={(e) => setSettingsName(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="settings-username">Юзернейм Telegram (без @)</label>
+                        <input type="text" id="settings-username" className="form-input" value={settingsUsername} onChange={(e) => setSettingsUsername(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="settings-phone">Контактный телефон</label>
+                        <input type="text" id="settings-phone" className="form-input" value={settingsPhone} onChange={(e) => setSettingsPhone(e.target.value)} placeholder="+996XXXXXXXXX" />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="settings-email">Email адрес</label>
+                        <input type="email" id="settings-email" className="form-input" value={settingsEmail} onChange={(e) => setSettingsEmail(e.target.value)} placeholder="mail@example.com" />
+                      </div>
+                      <button type="submit" className="btn-submit" disabled={isSubmittingSettings} style={{ marginTop: "1rem" }}>
+                        {isSubmittingSettings ? "Сохранение..." : "Сохранить изменения"}
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              )
+            ) : (
+              /* Platform Admin View: Split grid with orders, settings, and product form */
+              <>
+                <div className="admin-grid">
+                  <div className="admin-card">
+                    <h3>{dict.adminRecentOrders}</h3>
+                    <div className="admin-table-wrapper">
+                      <table className="admin-table">
+                        <thead>
+                          <tr>
+                            <th>ID</th>
+                            <th>Покупатель</th>
+                            <th>Товары</th>
+                            <th>Сумма USD</th>
+                            <th>Статус</th>
+                            <th>Тип заказа</th>
+                            <th>Дата</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {store.orders.map(o => (
+                            <tr key={o.id}>
+                              <td>#{o.id}</td>
+                              <td>
+                                <strong>{o.user?.name || "Гость"}</strong>
+                                <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                                  {o.user?.username ? `@${o.user.username}` : ""} | {o.user?.phone || ""}
+                                </div>
+                              </td>
+                              <td>{o.items || "Заказ устройства"}</td>
+                              <td>${o.totalUsd.toLocaleString()}</td>
+                              <td>
+                                <span className={`status-badge badge-${o.status}`}>{o.status}</span>
+                              </td>
+                              <td>
+                                <span className={`status-badge ${o.deliveryType === "pre-order" ? "badge-processing" : "badge-completed"}`}>{o.deliveryType}</span>
+                              </td>
+                              <td>{o.createdAt}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Settings & Add Product Column */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                    {/* Form editing settings */}
+                    <div className="admin-card" style={{ marginBottom: 0 }}>
+                      <h3>{dict.adminSettings}</h3>
+                      <div className="form-group">
+                        <label htmlFor="admin-rate">{dict.adminExchangeRate}</label>
+                        <input type="number" id="admin-rate" className="form-input" step="0.1" value={adminRate} onChange={(e) => setAdminRate(parseFloat(e.target.value) || 0)} />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="admin-dubai">{dict.adminDubaiCost}</label>
+                        <input type="number" id="admin-dubai" className="form-input" value={adminDubai} onChange={(e) => setAdminDubai(parseFloat(e.target.value) || 0)} />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="admin-korea">{dict.adminKoreaCost}</label>
+                        <input type="number" id="admin-korea" className="form-input" value={adminKorea} onChange={(e) => setAdminKorea(parseFloat(e.target.value) || 0)} />
+                      </div>
+                      <button className="btn-submit" onClick={() => store.saveSettings(adminRate, adminDubai, adminKorea)}>Сохранить</button>
+                    </div>
+
+                    {/* Form adding new product */}
+                    <div className="admin-card" style={{ marginBottom: 0 }}>
+                      <h3>Добавить новый товар</h3>
+                      <form onSubmit={handleAddProduct}>
+                        <div className="form-group">
+                          <label htmlFor="prod-brand-admin">Бренд</label>
+                          <select id="prod-brand-admin" className="form-input" value={newBrand} onChange={(e) => setNewBrand(e.target.value as any)}>
+                            <option value="Apple">Apple</option>
+                            <option value="Samsung">Samsung</option>
+                            <option value="Xiaomi">Xiaomi</option>
+                            <option value="Feature Phones">Кнопочные</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label htmlFor="prod-model-admin">Модель</label>
+                          <input type="text" id="prod-model-admin" className="form-input" placeholder="Galaxy S26 Ultra 512GB" value={newModel} onChange={(e) => setNewModel(e.target.value)} required />
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                          <div className="form-group">
+                            <label htmlFor="prod-price-admin">Цена розн. ($)</label>
+                            <input type="number" id="prod-price-admin" className="form-input" placeholder="1350" value={newBasePrice} onChange={(e) => setNewBasePrice(e.target.value)} required />
+                          </div>
+                          <div className="form-group">
+                            <label htmlFor="prod-wholesale-admin">Цена опт ($)</label>
+                            <input type="number" id="prod-wholesale-admin" className="form-input" placeholder="1250" value={newWholesalePrice} onChange={(e) => setNewWholesalePrice(e.target.value)} required />
+                          </div>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                          <div className="form-group">
+                            <label htmlFor="prod-qty-admin">Количество</label>
+                            <input type="number" id="prod-qty-admin" className="form-input" placeholder="5" value={newStockQty} onChange={(e) => setNewStockQty(e.target.value)} required />
+                          </div>
+                          <div className="form-group">
+                            <label htmlFor="prod-tag-admin">Состояние</label>
+                            <select id="prod-tag-admin" className="form-input" value={newStatusTag} onChange={(e) => setNewStatusTag(e.target.value as any)}>
+                              <option value="all">Без тега</option>
+                              <option value="new">Новое</option>
+                              <option value="imported">Б/У</option>
+                              <option value="promo">Промо</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {newBrand === "Apple" && newStatusTag === "imported" && (
+                          <div className="form-group">
+                            <label htmlFor="prod-battery-admin">Емкость АКБ (%)</label>
+                            <input type="number" id="prod-battery-admin" className="form-input" min="0" max="100" placeholder="85" value={newBatteryCapacity} onChange={(e) => setNewBatteryCapacity(e.target.value)} />
+                          </div>
+                        )}
+
+                        <div className="form-group">
+                          <label>Фотографии товара (первая фото будет обложкой)</label>
+                          
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem", minHeight: mediaItems.length ? "auto" : "50px", padding: "8px", border: "1px dashed var(--border)", borderRadius: "8px", backgroundColor: "rgba(255,255,255,0.02)" }}>
+                            {mediaItems.map((item, idx) => (
+                              <div key={item.id} className="media-preview-container" style={{ position: "relative", width: "80px", height: "80px", border: "1px solid var(--border)", borderRadius: "6px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#fff" }}>
+                                {item.url.startsWith("http") || item.url.startsWith("/") || item.url.startsWith("data:") ? (
+                                  <img src={item.url} alt="preview" style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }} />
+                                ) : (
+                                  <span style={{ fontSize: "0.75rem", color: "#333", fontWeight: "bold", textTransform: "uppercase" }}>{item.url}</span>
+                                )}
+                                
+                                <div className="media-controls-overlay" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "4px", opacity: 0, transition: "opacity 0.2s" }}>
+                                  <button type="button" onClick={() => handleRotateMedia(item.id)} style={{ width: "24px", height: "24px", borderRadius: "4px", border: "none", backgroundColor: "rgba(255,255,255,0.9)", color: "#000", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem" }} title="Повернуть 90°">
+                                    ↻
+                                  </button>
+                                  {idx > 0 && (
+                                    <button type="button" onClick={() => handleMoveMedia(idx, "left")} style={{ width: "24px", height: "24px", borderRadius: "4px", border: "none", backgroundColor: "rgba(255,255,255,0.9)", color: "#000", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem" }} title="Влево">
+                                      ←
+                                    </button>
+                                  )}
+                                  {idx < mediaItems.length - 1 && (
+                                    <button type="button" onClick={() => handleMoveMedia(idx, "right")} style={{ width: "24px", height: "24px", borderRadius: "4px", border: "none", backgroundColor: "rgba(255,255,255,0.9)", color: "#000", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem" }} title="Вправо">
+                                      →
+                                    </button>
+                                  )}
+                                  <button type="button" onClick={() => handleDeleteMedia(item.id)} style={{ width: "24px", height: "24px", borderRadius: "4px", border: "none", backgroundColor: "var(--danger)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.8rem" }} title="Удалить">
+                                    ×
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            
+                            <label style={{ width: "80px", height: "80px", border: "2px dashed var(--border)", borderRadius: "6px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--text-secondary)", fontSize: "1.5rem" }} title="Добавить фото">
+                              +
+                              <span style={{ fontSize: "0.55rem", marginTop: "2px" }}>Выбрать</span>
+                              <input type="file" multiple accept="image/*" onChange={handleFilesChange} style={{ display: "none" }} />
+                            </label>
+                          </div>
+
+                          <style dangerouslySetInnerHTML={{__html: `
+                            .media-preview-container:hover .media-controls-overlay {
+                              opacity: 1 !important;
+                            }
+                          `}} />
+
+                          <div style={{ display: "flex", gap: "0.5rem" }}>
+                            <input type="text" className="form-input" style={{ flex: 1 }} placeholder="Вставить URL или алиас (apple, samsung...)" value={urlInput} onChange={(e) => setUrlInput(e.target.value)} />
+                            <button type="button" className="qty-btn" style={{ width: "auto", padding: "0 12px" }} onClick={() => {
+                              if (urlInput.trim()) {
+                                handleAddUrlMedia(urlInput);
+                                setUrlInput("");
+                              }
+                            }}>Добавить</button>
+                          </div>
+                        </div>
+
+                        <div className="form-group" style={{ display: "flex", alignItems: "center", gap: "0.5rem", margin: "1rem 0" }}>
+                          <input type="checkbox" id="prod-active-admin" checked={newIsActive} onChange={(e) => setNewIsActive(e.target.checked)} style={{ cursor: "pointer", width: "16px", height: "16px" }} />
+                          <label htmlFor="prod-active-admin" style={{ cursor: "pointer", marginBottom: 0 }}>Показывать товар на сайте</label>
+                        </div>
+
+                        <div className="form-group">
+                          <label htmlFor="prod-desc-admin">Описание</label>
+                          <textarea id="prod-desc-admin" className="form-input" style={{ minHeight: "60px", resize: "vertical", fontFamily: "inherit" }} placeholder="Краткое описание товара..." value={newDescription} onChange={(e) => setNewDescription(e.target.value)} required />
+                        </div>
+
+                        <button type="submit" className="btn-submit" disabled={isSubmittingProduct} style={{ marginTop: "1rem" }}>
+                          {isSubmittingProduct ? "Сохранение..." : "Добавить товар"}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Telegram console log messages */}
+                <div className="admin-card" style={{ marginTop: "1.5rem" }}>
+                  <h3>{dict.adminTgLogs}</h3>
+                  <div className="tg-log-console">
+                    {store.tgLogs.map(log => (
+                      <div className="tg-log-line" key={log.id}>
+                        <div style={{ color: "#6c707e", marginBottom: "2px" }}>[{log.timestamp}] Hitting API hook dispatch:</div>
+                        <pre style={{ whiteSpace: "pre-wrap", fontFamily: "var(--font-mono)" }}>{log.payload}</pre>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </main>
       )}
@@ -860,17 +1776,49 @@ export default function Storefront() {
               )}
 
               {authMethod === "telegram" && (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", textAlign: "center" }}>
-                    Для авторизации нажмите на кнопку ниже.
+                    Используйте официальный виджет Telegram или введите данные вручную для симуляции:
                   </p>
                   
                   {/* Real Telegram Login Widget Container */}
-                  <div id="telegram-login-container" style={{ minHeight: "40px" }}></div>
+                  <div id="telegram-login-container" style={{ minHeight: "40px", display: "flex", justifyContent: "center" }}></div>
 
-                  <button type="button" className="btn-secondary" style={{ width: "100%", padding: "0.5rem" }} onClick={() => { setAuthMethod(null); }}>
-                    Назад
-                  </button>
+                  <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "1rem", marginTop: "0.5rem" }}>
+                    <form onSubmit={(e) => {
+                      e.preventDefault();
+                      if (authInputValue.trim()) {
+                        store.loginTelegram(authInputValue.trim());
+                      }
+                    }}>
+                      <div className="form-group" style={{ marginBottom: "1rem" }}>
+                        <label htmlFor="telegram-input" style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
+                          Telegram ID, username или Индекс:
+                        </label>
+                        <input
+                          type="text"
+                          id="telegram-input"
+                          className="form-input"
+                          placeholder="super_admin, C995506066, etc."
+                          value={authInputValue}
+                          onChange={(e) => setAuthInputValue(e.target.value)}
+                          required
+                          autoFocus
+                        />
+                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "6px", display: "block" }}>
+                          Симуляция Telegram Auth. Попробуйте <code>super_admin</code> или ID/Индекс из БД.
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <button type="button" className="btn-secondary" style={{ flex: 1, padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--border)", background: "transparent", color: "var(--text-primary)", cursor: "pointer" }} onClick={() => { setAuthMethod(null); setAuthInputValue(""); }}>
+                          Назад
+                        </button>
+                        <button type="submit" className="btn-submit" style={{ flex: 1, marginTop: 0, padding: "0.5rem" }}>
+                          Войти
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               )}
             </>

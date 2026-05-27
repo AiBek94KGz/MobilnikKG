@@ -123,7 +123,7 @@ export default function ProductDetails() {
               <div className="user-avatar" style={{ width: "24px", height: "24px", fontSize: "0.75rem" }}>
                 {session?.user?.name ? session.user.name.charAt(0) : "Г"}
               </div>
-              <span style={{ fontSize: "0.875rem", fontWeight: 600 }}>{session?.user?.name ? session.user.name.split(" ")[0] : "Войти"}</span>
+              <span style={{ fontSize: "0.875rem", fontWeight: 600 }}>{session?.user?.name || "Войти"}</span>
             </div>
           </div>
         </div>
@@ -186,6 +186,12 @@ export default function ProductDetails() {
                 <span>Состояние</span>
                 <strong>{product.statusTag === "new" ? "Новое" : "Б/У"}</strong>
               </div>
+              {product.brand === "Apple" && product.statusTag === "imported" && product.batteryCapacity && (
+                <div className="spec-row">
+                  <span>Емкость АКБ</span>
+                  <strong>{product.batteryCapacity}%</strong>
+                </div>
+              )}
               <div className="spec-row">
                 <span>Наличие</span>
                 <strong>{product.stockQuantity} ед.</strong>
