@@ -245,31 +245,41 @@ export default function Storefront() {
   const [authMethod, setAuthMethod] = useState<null | "google" | "telegram">(null);
   const [authInputValue, setAuthInputValue] = useState("");
 
-  useEffect(() => {
-    // 1. Define the callback for Telegram in the global window object
-    (window as any).onTelegramAuth = (user: any) => {
-      if (user) {
-        const identifier = user.username || user.id.toString();
-        store.loginTelegram(identifier);
-        setAuthMethod(null);
-      }
-    };
+  const [tgAuthSessionCode, setTgAuthSessionCode] = useState<string | null>(null);
+  const [isPollingTgAuth, setIsPollingTgAuth] = useState(false);
 
-    // 2. Load the widget only when needed
+  useEffect(() => {
     if (authMethod === "telegram") {
-      const container = document.getElementById("telegram-login-container");
-      if (container && container.innerHTML === "") {
-        const script = document.createElement("script");
-        script.src = "https://telegram.org/js/telegram-widget.js?22";
-        script.async = true;
-        script.setAttribute("data-telegram-login", "MobilnikKGBot");
-        script.setAttribute("data-size", "large");
-        script.setAttribute("data-onauth", "onTelegramAuth(user)");
-        script.setAttribute("data-request-access", "write");
-        container.appendChild(script);
-      }
+      const generatedCode = "AUTH_" + Math.random().toString(36).substring(2, 10).toUpperCase();
+      setTgAuthSessionCode(generatedCode);
+      setIsPollingTgAuth(true);
+    } else {
+      setTgAuthSessionCode(null);
+      setIsPollingTgAuth(false);
     }
-  }, [authMethod, store]);
+  }, [authMethod]);
+
+  useEffect(() => {
+    if (!isPollingTgAuth || !tgAuthSessionCode) return;
+
+    const intervalId = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/auth/tg-poll?code=${tgAuthSessionCode}`);
+        const data = await res.json();
+        
+        if (data.success && data.verified && data.username) {
+          clearInterval(intervalId);
+          setIsPollingTgAuth(false);
+          store.loginTelegram(data.username);
+          setAuthMethod(null);
+        }
+      } catch (err: any) {
+        console.error("Polling error:", err);
+      }
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [isPollingTgAuth, tgAuthSessionCode, store]);
 
   // 3. Handle redirect callback success parameters from telegram-callback
   useEffect(() => {
@@ -1777,47 +1787,103 @@ export default function Storefront() {
 
               {authMethod === "telegram" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  <p style={{ fontSize: "0.875rem", color: "var(--text-secondary)", textAlign: "center" }}>
-                    Используйте официальный виджет Telegram или введите данные вручную для симуляции:
-                  </p>
+                  <style>{`
+                    @keyframes pulse {
+                      0%, 100% { opacity: 1; transform: scale(1); }
+                      50% { opacity: 0.6; transform: scale(0.98); }
+                    }
+                    .tg-pulse-loader {
+                      animation: pulse 1.5s infinite ease-in-out;
+                    }
+                  `}</style>
                   
-                  {/* Real Telegram Login Widget Container */}
-                  <div id="telegram-login-container" style={{ minHeight: "40px", display: "flex", justifyContent: "center" }}></div>
+                  <div style={{ background: "rgba(0, 136, 204, 0.08)", border: "1px solid rgba(0, 136, 204, 0.2)", borderRadius: "8px", padding: "1rem", color: "var(--text-primary)" }}>
+                    <h4 style={{ margin: "0 0 0.5rem 0", color: "#0088cc", display: "flex", alignItems: "center", gap: "6px", fontSize: "0.95rem" }}>
+                      Войти через Telegram-бота
+                    </h4>
+                    <ol style={{ margin: 0, paddingLeft: "1.2rem", fontSize: "0.8rem", lineHeight: "1.5", color: "var(--text-secondary)" }}>
+                      <li>Нажмите синюю кнопку <b>«Открыть Telegram»</b> ниже</li>
+                      <li>В чате с ботом нажмите <b>«Запустить»</b> (или кнопку <b>Start</b>)</li>
+                      <li>После этого страница автоматически обновится</li>
+                    </ol>
+                  </div>
 
-                  <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "1rem", marginTop: "0.5rem" }}>
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if (authInputValue.trim()) {
-                        store.loginTelegram(authInputValue.trim());
-                      }
-                    }}>
-                      <div className="form-group" style={{ marginBottom: "1rem" }}>
-                        <label htmlFor="telegram-input" style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                          Telegram ID, username или Индекс:
-                        </label>
-                        <input
-                          type="text"
-                          id="telegram-input"
-                          className="form-input"
-                          placeholder="super_admin, C995506066, etc."
-                          value={authInputValue}
-                          onChange={(e) => setAuthInputValue(e.target.value)}
-                          required
-                          autoFocus
-                        />
-                        <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "6px", display: "block" }}>
-                          Симуляция Telegram Auth. Попробуйте <code>super_admin</code> или ID/Индекс из БД.
-                        </span>
+                  {tgAuthSessionCode ? (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.75rem", padding: "0.5rem 0" }}>
+                      <a 
+                        href={`https://t.me/MobilnikKGBot?start=${tgAuthSessionCode}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="tg-login-btn" 
+                        style={{ 
+                          display: "flex", alignItems: "center", justifyContent: "center", 
+                          background: "#0088cc", color: "#ffffff", padding: "0.85rem 1.5rem", 
+                          borderRadius: "8px", cursor: "pointer", fontWeight: 600, border: "none",
+                          textDecoration: "none", width: "100%", textAlign: "center",
+                          boxShadow: "0 4px 12px rgba(0,136,204,0.3)", transition: "all 0.2s"
+                        }}
+                      >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style={{ marginRight: "10px" }}>
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.11.02-1.93 1.23-5.46 3.62-.51.35-.98.53-1.39.52-.46-.01-1.33-.26-1.98-.48-.8-.27-1.43-.42-1.37-.89.03-.25.38-.51 1.03-.78 4.04-1.76 6.74-2.92 8.09-3.48 3.85-1.6 4.64-1.88 5.17-1.89.11 0 .37.03.54.17.14.12.18.28.2.45-.02.07-.02.16-.03.22z"/>
+                        </svg>
+                        Открыть Telegram
+                      </a>
+
+                      <div className="tg-pulse-loader" style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.5rem" }}>
+                        <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: "#0088cc" }}></span>
+                        Ожидаем подтверждения в боте...
                       </div>
-                      <div style={{ display: "flex", gap: "0.5rem" }}>
-                        <button type="button" className="btn-secondary" style={{ flex: 1, padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--border)", background: "transparent", color: "var(--text-primary)", cursor: "pointer" }} onClick={() => { setAuthMethod(null); setAuthInputValue(""); }}>
-                          Назад
-                        </button>
-                        <button type="submit" className="btn-submit" style={{ flex: 1, marginTop: 0, padding: "0.5rem" }}>
-                          Войти
-                        </button>
+
+                      <div style={{ fontSize: "0.65rem", color: "var(--text-muted)", background: "var(--background-soft)", padding: "4px 8px", borderRadius: "4px", border: "1px solid var(--border)" }}>
+                        Сессия: <code>{tgAuthSessionCode}</code>
                       </div>
-                    </form>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: "center", padding: "1rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+                      Генерация ссылки авторизации...
+                    </div>
+                  )}
+
+                  {/* SIMULATION FOR TESTING AND LOCAL DEV */}
+                  <details style={{ borderTop: "1px dashed var(--border)", marginTop: "0.5rem", paddingTop: "0.5rem" }}>
+                    <summary style={{ cursor: "pointer", fontSize: "0.75rem", color: "var(--text-muted)", userSelect: "none" }}>
+                      🛠️ Альтернативный вход (Симуляция)
+                    </summary>
+                    <div style={{ paddingTop: "0.75rem" }}>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        if (authInputValue.trim()) {
+                          store.loginTelegram(authInputValue.trim());
+                        }
+                      }}>
+                        <div className="form-group" style={{ marginBottom: "0.75rem" }}>
+                          <label htmlFor="telegram-input" style={{ display: "block", marginBottom: "0.25rem", fontSize: "0.75rem", color: "var(--text-secondary)" }}>
+                            ID, Username или Индекс:
+                          </label>
+                          <input
+                            type="text"
+                            id="telegram-input"
+                            className="form-input"
+                            placeholder="super_admin, C995506066, M4328912312"
+                            value={authInputValue}
+                            onChange={(e) => setAuthInputValue(e.target.value)}
+                            required
+                            style={{ padding: "0.4rem 0.6rem", fontSize: "0.8rem" }}
+                          />
+                        </div>
+                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                          <button type="submit" className="btn-submit" style={{ flex: 1, marginTop: 0, padding: "0.4rem", fontSize: "0.8rem" }}>
+                            Войти (симуляция)
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </details>
+
+                  <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                    <button type="button" className="btn-secondary" style={{ flex: 1, padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--border)", background: "transparent", color: "var(--text-primary)", cursor: "pointer" }} onClick={() => { setAuthMethod(null); setAuthInputValue(""); }}>
+                      Назад
+                    </button>
                   </div>
                 </div>
               )}

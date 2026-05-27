@@ -86,21 +86,30 @@ export const authOptions: NextAuthOptions = {
           }
 
           // Not found: register new client user with 'C' index
-          const newInserted = await db.insert(users).values({
-            name: tgClean,
-            username: tgClean,
-            telegramId: tgClean,
-            userIndex: `C${tgClean}`, // Auto-generate C-index for new clients
-            role: "client",
-          }).returning({ id: users.id });
+          let newId = 999999 + Math.floor(Math.random() * 1000000);
+          const index = `C${tgClean}`;
+          try {
+            const newInserted = await db.insert(users).values({
+              name: tgClean,
+              username: tgClean,
+              telegramId: tgClean,
+              userIndex: index, // Auto-generate C-index for new clients
+              role: "client",
+            }).returning({ id: users.id });
+            if (newInserted[0]) {
+              newId = newInserted[0].id;
+            }
+          } catch (e) {
+            console.log("⚠️ Database is read-only (Vercel). Continuing with temporary session ID.");
+          }
 
           return {
-            id: newInserted[0].id.toString(),
+            id: newId.toString(),
             name: tgClean,
             email: `${tgClean}@telegram.com`,
             role: "client",
             username: tgClean,
-            userIndex: `C${tgClean}`,
+            userIndex: index,
           };
         }
 
