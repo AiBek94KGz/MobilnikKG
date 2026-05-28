@@ -102,15 +102,15 @@ export const authOptions: NextAuthOptions = {
             };
           }
 
-          // Not found: register new client user with 'C' index
+          // Not found: register new client user
           let newId = 999999 + Math.floor(Math.random() * 1000000);
-          const index = `C${tgClean}`;
+          const index = tgClean; // Just the ID, no prefix
           try {
             const newInserted = await db.insert(users).values({
               name: tgClean,
               username: tgClean,
               telegramId: tgClean,
-              userIndex: index, // Auto-generate C-index for new clients
+              userIndex: index, 
               role: "client",
             }).returning({ id: users.id });
             if (newInserted[0]) {

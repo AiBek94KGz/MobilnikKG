@@ -66,9 +66,17 @@ export async function POST(request: Request) {
               name: firstName,
               username: username,
               telegramId: tgUser.id.toString(),
-              userIndex: `C${tgUser.id}`,
+              userIndex: tgUser.id.toString(), 
               role: "client",
             });
+          } else {
+            // Update existing user with latest info
+            console.log(`Updating existing user ${username} in DB`);
+            await db.update(users).set({
+              name: firstName,
+              username: username,
+              userIndex: tgUser.id.toString(), // Update index too if it had 'C'
+            }).where(eq(users.id, found[0].id));
           }
         } catch (dbErr: any) {
           console.log("⚠️ Database is read-only (Vercel) during webhook user registration. Continuing in-memory.", dbErr.message);
@@ -83,12 +91,46 @@ export async function POST(request: Request) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             chat_id: tgUser.id,
-            text: `🎉 <b>Вход выполнен успешно!</b>\n\nВы успешно вошли на сайт Mobilnik.KG под именем <b>@${username}</b>.\n\nВернитесь на вкладку сайта в браузере, вход произойдет автоматически.`,
+            text: `🎉 <b>Вход выполнен успешно!</b>\n\nВы успешно вошли на сайт Mobilnik.KG.\n\n👤 Имя: <b>${firstName}</b>\n🆔 ID: <code>${tgUser.id}</code>\n\nВернитесь на вкладку сайта, вход произойдет автоматически.\n\n👇 <i>Для автоматического заполнения номера телефона при заказах, нажмите кнопку ниже:</i>`,
             parse_mode: "HTML",
+            reply_markup: {
+              keyboard: [[{ text: "📲 Поделиться номером телефона", request_contact: true }]],
+              resize_keyboard: true,
+              one_time_keyboard: true
+            }
           }),
         }).catch(err => {
           console.error("Failed to send bot reply:", err);
         });
+      }
+    }
+
+    // Handle Contact sharing
+    if (message && message.contact) {
+      const contact = message.contact;
+      const tgId = contact.user_id.toString();
+      const phone = contact.phone_number.startsWith("+") ? contact.phone_number : `+${contact.phone_number}`;
+
+      console.log(`📱 Received phone number from TG: ${phone} for user ${tgId}`);
+
+      try {
+        await db.update(users).set({
+          phone: phone
+        }).where(eq(users.telegramId, tgId));
+
+        const botToken = process.env.TELEGRAM_BOT_TOKEN || "8985263287:AAE6Kof_fKIT7k8c8FQQBkPc7sEV0ICb0Hs";
+        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: message.chat.id,
+            text: `✅ <b>Номер телефона ${phone} привязан!</b>\n\nТеперь он будет автоматически подставляться при оформлении ваших заказов.`,
+            parse_mode: "HTML",
+            reply_markup: { remove_keyboard: true }
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to update phone in DB:", err);
       }
     }
 
