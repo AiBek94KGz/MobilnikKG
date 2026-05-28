@@ -62,7 +62,6 @@ export async function POST(request: Request) {
       exchangeRate,
       status: "pending",
       deliveryType: "pre-order",
-      createdAt: new Date().toISOString().replace("T", " ").substring(0, 16),
     }).returning({ insertedId: orders.id });
 
     const orderId = newOrder[0].insertedId;

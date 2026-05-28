@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sqlite } from "@/db";
+import { client } from "@/db";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 
@@ -19,12 +19,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action } = body;
 
-    // 2. Action: Get Tables List
+    // 2. Action: Get Tables List (PostgreSQL version)
     if (action === "get_tables") {
       try {
-        const rows = sqlite.prepare(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_drizzle_%';"
-        ).all() as any[];
+        const rows = await client.unsafe(
+          "SELECT tablename as name FROM pg_catalog.pg_tables WHERE schemaname = 'public' AND tablename NOT LIKE 'drizzle_%';"
+        );
         const tables = rows.map((r: any) => r.name);
         return NextResponse.json({ success: true, tables });
       } catch (err: any) {
@@ -40,14 +40,20 @@ export async function POST(request: Request) {
       }
 
       try {
-        const rows = sqlite.prepare(`SELECT * FROM \`${tableName}\` LIMIT 500;`).all();
+        const rows = await client.unsafe(`SELECT * FROM "${tableName}" LIMIT 500;`);
         
-        // Retrieve column headers from the first row or query table info
-        const tableInfo = sqlite.prepare(`PRAGMA table_info(\`${tableName}\`);`).all() as any[];
+        // Retrieve column headers from information_schema
+        const tableInfo = await client.unsafe(`
+          SELECT column_name as name, data_type as type, is_nullable as nullable
+          FROM information_schema.columns 
+          WHERE table_name = '${tableName}'
+          ORDER BY ordinal_position;
+        `);
+        
         const columns = tableInfo.map((col: any) => ({
           name: col.name,
           type: col.type,
-          pk: col.pk === 1,
+          pk: col.name === 'id', // Simple heuristic for our schema
         }));
 
         return NextResponse.json({ success: true, tableName, rows, columns });
@@ -63,38 +69,19 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: "SQL query is empty or invalid" }, { status: 400 });
       }
 
-      const cleanQuery = query.trim();
-      const isWriteQuery = /^(insert|update|delete|drop|alter|create|replace)/i.test(cleanQuery);
-      const hasReturning = /returning/i.test(cleanQuery);
-
       try {
         const start = performance.now();
-        let result;
-        let message = "";
-
-        if (isWriteQuery && !hasReturning) {
-          const info = sqlite.prepare(cleanQuery).run();
-          result = info;
-          message = `Запрос выполнен успешно! Изменено строк: ${info.changes}, ID последней вставки: ${info.lastInsertRowid}`;
-        } else {
-          result = sqlite.prepare(cleanQuery).all();
-          message = "Запрос выполнен успешно!";
-        }
-
+        const result = await client.unsafe(query);
         const elapsed = (performance.now() - start).toFixed(2);
 
         return NextResponse.json({
           success: true,
           result,
           elapsed,
-          message,
+          message: "Запрос выполнен успешно!",
         });
       } catch (err: any) {
-        let friendlyError = err.message;
-        if (err.message.includes("readonly") || err.message.includes("read-only")) {
-          friendlyError = "Ошибка: База данных находится в режиме 'Только чтение' (Vercel). Изменение структуры или данных отклонено.";
-        }
-        return NextResponse.json({ success: false, error: friendlyError });
+        return NextResponse.json({ success: false, error: err.message });
       }
     }
 

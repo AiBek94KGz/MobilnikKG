@@ -42,7 +42,6 @@ export async function POST(request: Request) {
       exchangeRate,
       status: "sold",
       deliveryType: "in-store",
-      createdAt: new Date().toISOString().replace("T", " ").substring(0, 16),
     }).returning({ id: orders.id });
 
     const orderId = newOrder[0].id;
