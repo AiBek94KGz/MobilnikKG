@@ -24,14 +24,21 @@ export async function GET(request: Request) {
       if (!authorized || !session) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      if (role !== "store_owner" && role !== "owner" && role !== "admin") {
+      if (role !== "store_owner" && role !== "store_staff" && role !== "owner" && role !== "admin") {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
       const userId = await getUserIdFromSession(session);
       if (!userId) return NextResponse.json({ products: [] });
+
+      const parentId = (session.user as any).parentId;
+      const effectiveOwnerId = role === "store_staff" ? parentId : userId;
       
-      // Find stores owned by this user
-      const userStores = await db.select({ id: stores.id }).from(stores).where(eq(stores.ownerId, userId));
+      if (!effectiveOwnerId && role !== "owner" && role !== "admin") {
+        return NextResponse.json({ products: [] });
+      }
+
+      // Find stores owned by the effective owner
+      const userStores = await db.select({ id: stores.id }).from(stores).where(eq(stores.ownerId, effectiveOwnerId));
       const storeIds = userStores.map(s => s.id);
       
       if (storeIds.length === 0 && role !== "owner" && role !== "admin") {
@@ -39,9 +46,6 @@ export async function GET(request: Request) {
       }
 
       if (role === "owner" || role === "admin") {
-         // Admins see everything when ownerParam=mine? 
-         // Or maybe we should still filter by their own stores? 
-         // For now, let's keep it consistent with "mine" meaning "owned by me"
          queryConditions.push(eq(products.ownerId, userId));
       } else {
          queryConditions.push(sql`${products.storeId} IN (${sql.join(storeIds, sql`, `)})`);

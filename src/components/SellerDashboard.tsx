@@ -53,7 +53,8 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
   const [isSubmittingSettings, setIsSubmittingSettings] = useState(false);
 
   // Stats
-  const totalInStock = myProducts.reduce((sum, p) => sum + p.stockQuantity, 0);
+  const totalPositions = myProducts.length;
+  const totalUnits = myProducts.reduce((sum, p) => sum + p.stockQuantity, 0);
   const lowStockCount = myProducts.filter(p => p.stockQuantity <= 3 && p.stockQuantity > 0).length;
   const confirmedSales = mySales.filter(s => s.status === "completed" || s.status === "sold");
   const totalRevenue = confirmedSales.reduce((sum, s) => sum + s.totalUsd, 0);
@@ -466,8 +467,12 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
     <div className="seller-dashboard">
       <div className="metrics-row" style={{ marginBottom: "2rem" }}>
         <div className="metric-box">
+          <div className="metric-title">Всего позиций</div>
+          <div className="metric-val">{totalPositions} мод.</div>
+        </div>
+        <div className="metric-box">
           <div className="metric-title">Всего в наличии</div>
-          <div className="metric-val">{totalInStock} ед.</div>
+          <div className="metric-val">{totalUnits} ед.</div>
         </div>
         <div className="metric-box">
           <div className="metric-title">Заканчивается</div>
