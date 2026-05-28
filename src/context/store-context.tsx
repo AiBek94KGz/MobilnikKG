@@ -8,6 +8,8 @@ export interface Product {
   id: number;
   brand: string;
   model: string;
+  memory?: string | null;
+  color?: string | null;
   priceUsd: number;
   isWholesalePrice: boolean;
   basePriceUsd: number;
