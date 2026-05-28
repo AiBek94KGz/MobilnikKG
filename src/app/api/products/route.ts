@@ -71,6 +71,8 @@ export async function GET(request: Request) {
         id: p.id,
         brand: p.brand,
         model: p.model,
+        memory: p.memory,
+        color: p.color,
         priceUsd: price,
         isWholesalePrice: isWholesale,
         basePriceUsd: p.basePriceUsd,
@@ -103,13 +105,13 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { brand, model, basePriceUsd, wholesalePriceUsd, stockQuantity, statusTag, imageUrl, description, isActive, batteryCapacity, storeId } = body;
+    const { brand, model, memory, color, basePriceUsd, wholesalePriceUsd, stockQuantity, statusTag, imageUrl, description, isActive, batteryCapacity, storeId } = body;
 
     if (!brand || !model || basePriceUsd === undefined || wholesalePriceUsd === undefined || stockQuantity === undefined || !imageUrl || !description) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    if (!["Apple", "Samsung", "Xiaomi", "Feature Phones"].includes(brand)) {
+    if (!["Apple", "Samsung", "Xiaomi", "Huawei", "Honor", "Realme", "Tecno", "Infinix", "Poco", "Google", "OnePlus", "Feature Phones"].includes(brand)) {
       return NextResponse.json({ error: "Invalid brand" }, { status: 400 });
     }
 
@@ -139,6 +141,8 @@ export async function POST(request: Request) {
       storeId: finalStoreId,
       brand: brand as any,
       model,
+      memory: memory || null,
+      color: color || null,
       basePriceUsd: parseInt(basePriceUsd, 10),
       wholesalePriceUsd: parseInt(wholesalePriceUsd, 10),
       stockQuantity: parseInt(stockQuantity, 10),
@@ -168,7 +172,7 @@ export async function PATCH(request: Request) {
 
   try {
     const body = await request.json();
-    const { id, brand, model, basePriceUsd, wholesalePriceUsd, stockQuantity, statusTag, imageUrl, description, isActive, batteryCapacity } = body;
+    const { id, brand, model, memory, color, basePriceUsd, wholesalePriceUsd, stockQuantity, statusTag, imageUrl, description, isActive, batteryCapacity } = body;
 
     if (!id) {
       return NextResponse.json({ error: "Product ID is required" }, { status: 400 });
@@ -201,6 +205,8 @@ export async function PATCH(request: Request) {
     const updateData: any = {};
     if (brand !== undefined) updateData.brand = brand;
     if (model !== undefined) updateData.model = model;
+    if (memory !== undefined) updateData.memory = memory;
+    if (color !== undefined) updateData.color = color;
     if (basePriceUsd !== undefined) updateData.basePriceUsd = parseInt(basePriceUsd, 10);
     if (wholesalePriceUsd !== undefined) updateData.wholesalePriceUsd = parseInt(wholesalePriceUsd, 10);
     if (stockQuantity !== undefined) updateData.stockQuantity = parseInt(stockQuantity, 10);

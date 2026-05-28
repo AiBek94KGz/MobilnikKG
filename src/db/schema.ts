@@ -34,8 +34,10 @@ export const products = sqliteTable("products", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   ownerId: integer("owner_id").references(() => users.id), // Legacy: Which user owns this (fallback)
   storeId: integer("store_id").references(() => stores.id), // NEW: Which store owns this product
-  brand: text("brand", { enum: ["Apple", "Samsung", "Xiaomi", "Feature Phones"] }).notNull(),
+  brand: text("brand", { enum: ["Apple", "Samsung", "Xiaomi", "Huawei", "Honor", "Realme", "Tecno", "Infinix", "Poco", "Google", "OnePlus", "Feature Phones"] }).notNull(),
   model: text("model").notNull(),
+  memory: text("memory"), // e.g. "8/256GB", "128GB"
+  color: text("color"), // e.g. "Deep Blue", "Space Gray"
   basePriceUsd: integer("base_price_usd").notNull(),
   wholesalePriceUsd: integer("wholesale_price_usd").notNull(),
   stockQuantity: integer("stock_quantity").notNull(),
@@ -49,14 +51,15 @@ export const products = sqliteTable("products", {
 // 3. Orders Table
 export const orders = sqliteTable("orders", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("user_id").references(() => users.id),
-  totalUsd: integer("total_usd").notNull(),
-  currencyUsed: text("currency_used", { enum: ["USD", "KGS"] }).notNull(),
+  userId: integer("user_id").references(() => users.id), // Can be null for offline sales
+  totalUsd: real("total_usd").notNull(),
+  currencyUsed: text("currency_used", { enum: ["USD", "KGS"] }).default("USD").notNull(),
   exchangeRate: real("exchange_rate").notNull(),
-  status: text("status", { enum: ["pending", "processing", "completed", "cancelled"] }).default("pending").notNull(),
-  deliveryType: text("delivery_type", { enum: ["local", "pre-order"] }).default("local").notNull(),
-  createdAt: text("created_at").notNull(),
+  status: text("status", { enum: ["pending", "processing", "completed", "cancelled", "sold"] }).default("pending").notNull(),
+  deliveryType: text("delivery_type", { enum: ["local", "pre-order", "in-store"] }).default("local").notNull(),
+  createdAt: text("created_at").default("CURRENT_TIMESTAMP").notNull(),
 });
+
 
 // 4. Order Items Table
 export const orderItems = sqliteTable("order_items", {

@@ -13,16 +13,19 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
   const store = useStore();
   
   // Tab state
-  const [lkTab, setLkTab] = useState<"products" | "staff" | "settings">("products");
+  const [lkTab, setLkTab] = useState<"products" | "sales" | "staff" | "settings">("products");
   
   // Data listings
   const [myProducts, setMyProducts] = useState<any[]>([]);
   const [myStaff, setMyStaff] = useState<any[]>([]);
+  const [mySales, setMySales] = useState<any[]>([]);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
   // Product form states
-  const [newBrand, setNewBrand] = useState<"Apple" | "Samsung" | "Xiaomi" | "Feature Phones">("Apple");
+  const [newBrand, setNewBrand] = useState<"Apple" | "Samsung" | "Xiaomi" | "Huawei" | "Honor" | "Realme" | "Tecno" | "Infinix" | "Poco" | "Google" | "OnePlus" | "Feature Phones">("Apple");
   const [newModel, setNewModel] = useState("");
+  const [newMemory, setNewMemory] = useState("");
+  const [newColor, setNewColor] = useState("");
   const [newBasePrice, setNewBasePrice] = useState("");
   const [newWholesalePrice, setNewWholesalePrice] = useState("");
   const [newStockQty, setNewStockQty] = useState("");
@@ -49,6 +52,12 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
   const [settingsEmail, setSettingsEmail] = useState("");
   const [isSubmittingSettings, setIsSubmittingSettings] = useState(false);
 
+  // Stats
+  const totalInStock = myProducts.reduce((sum, p) => sum + p.stockQuantity, 0);
+  const lowStockCount = myProducts.filter(p => p.stockQuantity <= 3 && p.stockQuantity > 0).length;
+  const confirmedSales = mySales.filter(s => s.status === "completed" || s.status === "sold");
+  const totalRevenue = confirmedSales.reduce((sum, s) => sum + s.totalUsd, 0);
+
   useEffect(() => {
     if (session?.user) {
       setSettingsName(session.user.name || "");
@@ -60,13 +69,60 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
 
   const fetchMyProducts = async () => {
     try {
-      const res = await fetch("/api/products?owner=mine");
+      const res = await fetch(`/api/products?owner=mine&t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         setMyProducts(data.products || []);
       }
     } catch (err) {
       console.error("Failed to fetch my products:", err);
+    }
+  };
+
+  const fetchMySales = async () => {
+    try {
+      const res = await fetch(`/api/orders?t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMySales(data.orders || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch sales:", err);
+    }
+  };
+
+  const handleMarkAsSold = async (product: any) => {
+    const qty = prompt(`Сколько единиц «${product.model}» продано?`, "1");
+    if (!qty || isNaN(parseInt(qty)) || parseInt(qty) <= 0) return;
+    
+    const count = parseInt(qty);
+    if (count > product.stockQuantity) {
+      alert("Недостаточно товара на складе!");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/store/sale", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          quantity: count,
+          pricePaidUsd: product.basePriceUsd,
+          exchangeRate: store.exchangeRate
+        })
+      });
+
+      if (res.ok) {
+        alert("Продажа зафиксирована!");
+        fetchMyProducts();
+        store.refetchProducts();
+      } else {
+        const err = await res.json();
+        alert(`Ошибка: ${err.error}`);
+      }
+    } catch (err) {
+      alert("Ошибка сети");
     }
   };
 
@@ -91,6 +147,8 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
     setEditingProduct(p);
     setNewBrand(p.brand);
     setNewModel(p.model);
+    setNewMemory(p.memory || "");
+    setNewColor(p.color || "");
     setNewBasePrice(p.basePriceUsd.toString());
     setNewWholesalePrice(p.wholesalePriceUsd.toString());
     setNewStockQty(p.stockQuantity.toString());
@@ -111,6 +169,8 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
   const handleCancelEdit = () => {
     setEditingProduct(null);
     setNewModel("");
+    setNewMemory("");
+    setNewColor("");
     setNewBasePrice("");
     setNewWholesalePrice("");
     setNewStockQty("");
@@ -256,6 +316,8 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
       const payload: any = {
         brand: newBrand,
         model: newModel.trim(),
+        memory: newMemory.trim() || null,
+        color: newColor.trim() || null,
         basePriceUsd: parseInt(newBasePrice, 10),
         wholesalePriceUsd: parseInt(newWholesalePrice, 10),
         stockQuantity: parseInt(newStockQty, 10),
@@ -402,10 +464,26 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
 
   return (
     <div className="seller-dashboard">
+      <div className="metrics-row" style={{ marginBottom: "2rem" }}>
+        <div className="metric-box">
+          <div className="metric-title">Всего в наличии</div>
+          <div className="metric-val">{totalInStock} ед.</div>
+        </div>
+        <div className="metric-box">
+          <div className="metric-title">Заканчивается</div>
+          <div className="metric-val" style={{ color: lowStockCount > 0 ? "#edd456" : "inherit" }}>{lowStockCount} поз.</div>
+        </div>
+        <div className="metric-box">
+          <div className="metric-title">Выручка (завершено)</div>
+          <div className="metric-val" style={{ color: "var(--success)" }}>${totalRevenue.toLocaleString()}</div>
+        </div>
+      </div>
+
       <div className="status-pills" style={{ marginBottom: "1.5rem", display: "flex", gap: "0.5rem" }}>
-        <button className={`status-pill ${lkTab === "products" ? "active" : ""}`} onClick={() => setLkTab("products")}>Управление товарами</button>
-        <button className={`status-pill ${lkTab === "staff" ? "active" : ""}`} onClick={() => setLkTab("staff")}>Сотрудники магазина</button>
-        <button className={`status-pill ${lkTab === "settings" ? "active" : ""}`} onClick={() => setLkTab("settings")}>Настройки магазина</button>
+        <button className={`status-pill ${lkTab === "products" ? "active" : ""}`} onClick={() => setLkTab("products")}>📦 Товары</button>
+        <button className={`status-pill ${lkTab === "sales" ? "active" : ""}`} onClick={() => setLkTab("sales")}>📈 История продаж</button>
+        <button className={`status-pill ${lkTab === "staff" ? "active" : ""}`} onClick={() => setLkTab("staff")}>👥 Сотрудники</button>
+        <button className={`status-pill ${lkTab === "settings" ? "active" : ""}`} onClick={() => setLkTab("settings")}>⚙️ Настройки</button>
       </div>
 
       {lkTab === "products" && (
@@ -420,7 +498,6 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
                     <th>Бренд</th>
                     <th>Модель</th>
                     <th>Цена ($)</th>
-                    <th>Опт ($)</th>
                     <th>Кол-во</th>
                     <th>Статус</th>
                     <th>Действия</th>
@@ -430,9 +507,11 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
                   {myProducts.map((p) => (
                     <tr key={p.id} style={{ opacity: p.isActive ? 1 : 0.6 }}>
                       <td><strong>{p.brand}</strong></td>
-                      <td>{p.model}</td>
+                      <td>
+                        {p.model}
+                        {p.stockQuantity <= 3 && p.stockQuantity > 0 && <span style={{ marginLeft: "8px", fontSize: "0.6rem", color: "#edd456", background: "rgba(237,212,86,0.1)", padding: "2px 5px", borderRadius: "4px" }}>ЗАКОНЧИВАЕТСЯ</span>}
+                      </td>
                       <td>${p.basePriceUsd}</td>
-                      <td>${p.wholesalePriceUsd}</td>
                       <td>{p.stockQuantity} ед</td>
                       <td>
                         <button onClick={() => handleToggleProductActive(p)} className={`status-badge ${p.isActive ? 'badge-completed' : 'badge-cancelled'}`} style={{ border: 'none', cursor: 'pointer' }}>
@@ -441,8 +520,9 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
                       </td>
                       <td>
                         <div style={{ display: "flex", gap: "0.5rem" }}>
+                          <button className="qty-btn" style={{ width: "auto", padding: "0 8px", fontSize: "0.75rem", background: "var(--success)", color: "#fff", border: "none" }} onClick={() => handleMarkAsSold(p)}>ПРОДАНО</button>
                           <button className="qty-btn" style={{ width: "auto", padding: "0 6px", fontSize: "0.75rem" }} onClick={() => handleEditClick(p)}>Ред.</button>
-                          <button className="qty-btn" style={{ width: "auto", padding: "0 6px", fontSize: "0.75rem", color: "var(--danger)", borderColor: "var(--danger)" }} onClick={() => handleDeleteProduct(p.id)}>Удал.</button>
+                          <button className="qty-btn" style={{ width: "auto", padding: "0 6px", fontSize: "0.75rem", color: "var(--danger)", borderColor: "var(--danger)" }} onClick={() => handleDeleteProduct(p.id)}>🗑</button>
                         </div>
                       </td>
                     </tr>
@@ -462,12 +542,30 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
                   <option value="Apple">Apple</option>
                   <option value="Samsung">Samsung</option>
                   <option value="Xiaomi">Xiaomi</option>
+                  <option value="Poco">Poco</option>
+                  <option value="Huawei">Huawei</option>
+                  <option value="Honor">Honor</option>
+                  <option value="Realme">Realme</option>
+                  <option value="Tecno">Tecno</option>
+                  <option value="Infinix">Infinix</option>
+                  <option value="Google">Google</option>
+                  <option value="OnePlus">OnePlus</option>
                   <option value="Feature Phones">Другие</option>
                 </select>
               </div>
               <div className="form-group">
                 <label>Модель</label>
                 <input type="text" className="form-input" value={newModel} onChange={(e) => setNewModel(e.target.value)} required />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                <div className="form-group">
+                  <label>Память</label>
+                  <input type="text" className="form-input" placeholder="8/256GB" value={newMemory} onChange={(e) => setNewMemory(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>Цвет</label>
+                  <input type="text" className="form-input" placeholder="Черный" value={newColor} onChange={(e) => setNewColor(e.target.value)} />
+                </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                 <div className="form-group">
@@ -506,21 +604,30 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
                 <label>Фотографии</label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem", padding: "8px", border: "1px dashed var(--border)", borderRadius: "8px" }}>
                   {mediaItems.map((item, idx) => (
-                    <div key={item.id} style={{ position: "relative", width: "60px", height: "60px", border: "1px solid var(--border)", borderRadius: "6px", overflow: "hidden" }}>
+                    <div key={item.id} style={{ position: "relative", width: "80px", height: "80px", border: "1px solid var(--border)", borderRadius: "6px", overflow: "hidden", background: "#fff" }}>
                       <img src={item.url} alt="preview" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                      <button type="button" onClick={() => handleDeleteMedia(item.id)} style={{ position: "absolute", top: 0, right: 0, background: "red", color: "white", border: "none", borderRadius: "50%", width: "16px", height: "16px", fontSize: "10px", cursor: "pointer" }}>×</button>
+                      
+                      {/* Delete button */}
+                      <button type="button" onClick={() => handleDeleteMedia(item.id)} style={{ position: "absolute", top: 2, right: 2, background: "rgba(239,68,68,0.9)", color: "white", border: "none", borderRadius: "50%", width: "18px", height: "18px", fontSize: "12px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3 }}>&times;</button>
+                      
+                      {/* Move controls */}
+                      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", background: "rgba(0,0,0,0.5)", height: "20px" }}>
+                        <button type="button" onClick={() => handleMoveMedia(idx, "left")} disabled={idx === 0} style={{ flex: 1, background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: "10px", opacity: idx === 0 ? 0.3 : 1 }}>&larr;</button>
+                        <button type="button" onClick={() => handleMoveMedia(idx, "right")} disabled={idx === mediaItems.length - 1} style={{ flex: 1, background: "none", border: "none", color: "#fff", cursor: "pointer", fontSize: "10px", opacity: idx === mediaItems.length - 1 ? 0.3 : 1 }}>&rarr;</button>
+                      </div>
                     </div>
                   ))}
-                  <label style={{ width: "60px", height: "60px", border: "2px dashed var(--border)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                  <label style={{ width: "80px", height: "80px", border: "2px dashed var(--border)", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "1.5rem", color: "var(--text-muted)" }}>
                     +
                     <input type="file" multiple accept="image/*" onChange={handleFilesChange} style={{ display: "none" }} />
                   </label>
                 </div>
+                <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Первое фото будет основным в каталоге.</span>
               </div>
 
               <div className="form-group">
                 <label>Описание</label>
-                <textarea className="form-input" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} required />
+                <textarea className="form-input" style={{ height: "200px", lineHeight: "1.6" }} value={newDescription} onChange={(e) => setNewDescription(e.target.value)} required />
               </div>
 
               <div style={{ display: "flex", gap: "0.5rem" }}>
@@ -530,6 +637,49 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {lkTab === "sales" && (
+        <div className="admin-card">
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
+            <h3>📈 История продаж магазина</h3>
+            <button onClick={fetchMySales} className="qty-btn" style={{ width: "auto", padding: "0 10px" }}>🔄 Обновить</button>
+          </div>
+          <div className="admin-table-wrapper">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Товар</th>
+                  <th>Тип продажи</th>
+                  <th>Кол-во</th>
+                  <th>Сумма USD</th>
+                  <th>Дата</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mySales.length === 0 ? (
+                  <tr><td colSpan={6} style={{ textAlign: "center", padding: "2rem", color: "var(--text-muted)" }}>Продаж пока нет</td></tr>
+                ) : (
+                  mySales.map(s => (
+                    <tr key={s.id}>
+                      <td>#{s.id}</td>
+                      <td><strong>{s.items}</strong></td>
+                      <td>
+                        <span className={`status-badge ${s.deliveryType === 'in-store' ? 'badge-processing' : 'badge-completed'}`}>
+                          {s.deliveryType === 'in-store' ? "Оффлайн" : "Через сайт"}
+                        </span>
+                      </td>
+                      <td>{s.items.split("x").pop() || 1}</td>
+                      <td><strong style={{ color: "var(--success)" }}>${s.totalUsd}</strong></td>
+                      <td style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>{s.createdAt}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

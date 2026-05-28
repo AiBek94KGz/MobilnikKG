@@ -171,6 +171,8 @@ export function ProductCard({
       <div className="product-model">{product.model}</div>
       <div className="product-specs">
         <ul className="product-specs-list">
+          {product.memory && <li><span>Память:</span> <strong>{product.memory}</strong></li>}
+          {product.color && <li><span>Цвет:</span> <strong>{product.color}</strong></li>}
           <li><span>Состояние:</span> <strong>{product.statusTag === "new" ? "Новое" : "Б/У"}</strong></li>
           {product.brand === "Apple" && product.statusTag === "imported" && product.batteryCapacity && (
             <li><span>АКБ:</span> <strong>{product.batteryCapacity}%</strong></li>

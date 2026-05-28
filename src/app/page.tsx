@@ -11,6 +11,7 @@ import { AuthWidget } from "@/components/AuthWidget";
 import { SellerDashboard } from "@/components/SellerDashboard";
 import { PreorderCalculator } from "@/components/PreorderCalculator";
 import { PlatformAdminDashboard } from "@/components/PlatformAdminDashboard";
+import { ClientDashboard } from "@/components/ClientDashboard";
 
 // --- SVG Icons Map for Device Rendering ---
 const svgIcons: Record<string, React.ReactNode> = {
@@ -108,9 +109,9 @@ export default function Storefront() {
             <div className={`section-tab ${store.section === "preorder" ? "active" : ""}`} onClick={() => store.setSection("preorder")}>
               {dict.navPreOrder}
             </div>
-            {session?.user && (isPlatformAdmin || isStoreOwner) && (
+            {session?.user && (isPlatformAdmin || isStoreOwner || role === "client" || role === "wholesale") && (
               <div className={`section-tab ${store.section === "admin" ? "active" : ""}`} style={{ backgroundColor: "var(--danger)", color: "#fff" }} onClick={() => store.setSection("admin")}>
-                {isStoreOwner ? "ЛК Магазина" : "Админка"}
+                {isStoreOwner ? "ЛК Магазина" : (isPlatformAdmin ? "Админка" : "Мои заказы")}
               </div>
             )}
           </div>
@@ -186,11 +187,18 @@ export default function Storefront() {
           <section className="brand-tabs-container">
             <div className="container">
               <div className="brand-tabs">
-                {(["all", "Apple", "Samsung", "Xiaomi", "Feature Phones"] as const).map(b => (
-                  <button key={b} className={`brand-tab ${store.selectedBrand === b ? "active" : ""}`} onClick={() => { store.setSelectedBrand(b); store.setSelectedStatus("all"); }}>
-                    {b === "all" ? dict.brandAll : (b === "Feature Phones" ? "Другие" : b)}
-                  </button>
-                ))}
+                {/* Dynamically show only brands that have products available, plus 'all' */}
+                {(() => {
+                  const availableBrands = Array.from(new Set(store.products.map(p => p.brand)));
+                  const tabsToShow = ["all", "Apple", "Samsung", "Xiaomi", "Poco", "Huawei", "Honor", "Realme", "Tecno", "Infinix", "Google", "OnePlus", "Feature Phones"]
+                    .filter(b => b === "all" || availableBrands.includes(b));
+                  
+                  return tabsToShow.map(b => (
+                    <button key={b} className={`brand-tab ${store.selectedBrand === b ? "active" : ""}`} onClick={() => { store.setSelectedBrand(b); store.setSelectedStatus("all"); }}>
+                      {b === "all" ? dict.brandAll : (b === "Feature Phones" ? "Другие" : b)}
+                    </button>
+                  ));
+                })()}
               </div>
               <div className="status-pills">
                 {(["all", "new", "imported", "promo"] as const).map(s => (
@@ -222,7 +230,7 @@ export default function Storefront() {
         <main className="admin-section">
           <div className="container">
             <div className="admin-header-row">
-              <h1>{isStoreOwner ? "Личный кабинет магазина" : "Панель управления"}</h1>
+              <h1>{isStoreOwner ? "Личный кабинет магазина" : (isPlatformAdmin ? "Панель управления" : "Ваши заказы")}</h1>
               <div style={{ display: "flex", gap: "0.5rem" }}>
                 {isPlatformAdmin && (
                   <button className="hero-btn" style={{ background: "var(--success)", color: "#fff" }} onClick={() => setIsDbExplorerOpen(true)}>🛢️ БД</button>
@@ -233,8 +241,10 @@ export default function Storefront() {
 
             {isStoreOwner ? (
               <SellerDashboard dict={dict} />
-            ) : (
+            ) : isPlatformAdmin ? (
               <PlatformAdminDashboard dict={dict} isPlatformAdmin={isPlatformAdmin} />
+            ) : (
+              <ClientDashboard dict={dict} />
             )}
           </div>
         </main>

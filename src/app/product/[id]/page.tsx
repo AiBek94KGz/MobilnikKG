@@ -136,8 +136,12 @@ export default function ProductDetails() {
               
               {images.length > 1 && (
                 <>
-                  <button className="nav-arrow left" onClick={prevImg}>&lsaquo;</button>
-                  <button className="nav-arrow right" onClick={nextImg}>&rsaquo;</button>
+                  <button className="nav-arrow-new left" onClick={prevImg}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                  </button>
+                  <button className="nav-arrow-new right" onClick={nextImg}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                  </button>
                 </>
               )}
             </div>
@@ -172,6 +176,18 @@ export default function ProductDetails() {
                 <span>Состояние</span>
                 <strong>{product.statusTag === "new" ? "Новое" : "Б/У"}</strong>
               </div>
+              {product.memory && (
+                <div className="spec-row">
+                  <span>Память</span>
+                  <strong>{product.memory}</strong>
+                </div>
+              )}
+              {product.color && (
+                <div className="spec-row">
+                  <span>Цвет</span>
+                  <strong>{product.color}</strong>
+                </div>
+              )}
               {product.brand === "Apple" && product.statusTag === "imported" && product.batteryCapacity && (
                 <div className="spec-row">
                   <span>Емкость АКБ</span>
@@ -215,25 +231,30 @@ export default function ProductDetails() {
           max-width: 100%;
           object-fit: contain;
         }
-        .nav-arrow {
+        .nav-arrow-new {
           position: absolute;
           top: 50%;
           transform: translateY(-50%);
-          background: rgba(0,0,0,0.05);
+          background: #ffffff;
           border: none;
-          width: 36px;
-          height: 36px;
+          width: 44px;
+          height: 44px;
           border-radius: 50%;
           cursor: pointer;
-          font-size: 1.5rem;
           display: flex;
           align-items: center;
           justify-content: center;
-          transition: background 0.2s;
+          color: #1e1f22;
+          box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+          transition: all 0.2s ease;
+          z-index: 10;
         }
-        .nav-arrow:hover { background: rgba(0,0,0,0.1); }
-        .nav-arrow.left { left: 1rem; }
-        .nav-arrow.right { right: 1rem; }
+        .nav-arrow-new:hover { 
+          transform: translateY(-50%) scale(1.05);
+          box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        .nav-arrow-new.left { left: 1rem; }
+        .nav-arrow-new.right { right: 1rem; }
 
         .thumbnails-row {
           display: flex;
