@@ -61,15 +61,31 @@ export async function POST(request: Request) {
     const cleanUsername = username ? username.trim().replace("@", "") : null;
     const cleanTgId = telegramId ? telegramId.toString().trim() : null;
 
-    // Check for collisions
-    if (cleanUsername) {
-      const exists = await db.select().from(users).where(eq(users.username, cleanUsername)).limit(1);
-      if (exists[0]) return NextResponse.json({ error: "Username already exists" }, { status: 400 });
-    }
-    
+    // Check if user already exists
+    let existingUser = null;
     if (cleanTgId) {
-      const exists = await db.select().from(users).where(eq(users.telegramId, cleanTgId)).limit(1);
-      if (exists[0]) return NextResponse.json({ error: "Telegram ID already associated with another account" }, { status: 400 });
+      const res = await db.select().from(users).where(eq(users.telegramId, cleanTgId)).limit(1);
+      if (res[0]) existingUser = res[0];
+    }
+    if (!existingUser && cleanUsername) {
+      const res = await db.select().from(users).where(eq(users.username, cleanUsername)).limit(1);
+      if (res[0]) existingUser = res[0];
+    }
+
+    if (existingUser) {
+      // If user exists and is just a client, upgrade them to staff
+      if (existingUser.role === "client" || existingUser.role === "store_staff") {
+        await db.update(users).set({
+          role: "store_staff",
+          parentId: parentId,
+          // Update name/phone if provided and missing
+          name: name || existingUser.name,
+        }).where(eq(users.id, existingUser.id));
+        
+        return NextResponse.json({ success: true, staffId: existingUser.id, message: "Existing user added to staff" });
+      } else {
+        return NextResponse.json({ error: `User exists with role: ${existingUser.role}. Cannot demote to staff.` }, { status: 400 });
+      }
     }
 
     const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
