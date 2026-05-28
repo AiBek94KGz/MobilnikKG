@@ -5,14 +5,17 @@ import * as schema from "./schema";
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
-  console.warn("⚠️ DATABASE_URL is not set. Database operations will fail on Vercel.");
+  console.error("❌ CRITICAL: DATABASE_URL environment variable is missing!");
+  // In serverless, we want to avoid crashing the whole process but operations will fail.
 }
 
-// Use a more robust connection configuration for Supabase/Vercel
-export const client = postgres(connectionString || "postgresql://localhost:5432/postgres", {
-  ssl: "require", // Supabase requires SSL
-  connect_timeout: 10,
-  max: 10, // Limit connections for serverless
-});
+// Configuration for Supabase
+const clientConfig = {
+  ssl: "require",
+  connect_timeout: 15,
+  max: 5, // Tighter connection limit for Vercel functions
+  prepare: false, // Required for some transaction poolers
+};
 
+export const client = postgres(connectionString || "postgresql://not-set-placeholder", clientConfig);
 export const db = drizzle(client, { schema });
