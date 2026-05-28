@@ -68,6 +68,7 @@ export default function Storefront() {
 
   const role = session?.user ? (session.user as any).role : null;
   const isStoreOwner = role === "store_owner";
+  const isStoreStaff = role === "store_staff";
   const isPlatformAdmin = role === "owner" || role === "admin";
 
   const renderPrice = (usdVal: number) => {
@@ -109,9 +110,9 @@ export default function Storefront() {
             <div className={`section-tab ${store.section === "preorder" ? "active" : ""}`} onClick={() => store.setSection("preorder")}>
               {dict.navPreOrder}
             </div>
-            {session?.user && (isPlatformAdmin || isStoreOwner || role === "client" || role === "wholesale") && (
+            {session?.user && (isPlatformAdmin || isStoreOwner || isStoreStaff || role === "client" || role === "wholesale") && (
               <div className={`section-tab ${store.section === "admin" ? "active" : ""}`} style={{ backgroundColor: "var(--danger)", color: "#fff" }} onClick={() => store.setSection("admin")}>
-                {isStoreOwner ? "ЛК Магазина" : (isPlatformAdmin ? "Админка" : "Мои заказы")}
+                {isStoreOwner || isStoreStaff ? "ЛК Магазина" : (isPlatformAdmin ? "Админка" : "Мои заказы")}
               </div>
             )}
           </div>
@@ -230,7 +231,7 @@ export default function Storefront() {
         <main className="admin-section">
           <div className="container">
             <div className="admin-header-row">
-              <h1>{isStoreOwner ? "Личный кабинет магазина" : (isPlatformAdmin ? "Панель управления" : "Ваши заказы")}</h1>
+              <h1>{isStoreOwner || isStoreStaff ? "Личный кабинет магазина" : (isPlatformAdmin ? "Панель управления" : "Ваши заказы")}</h1>
               <div style={{ display: "flex", gap: "0.5rem" }}>
                 {isPlatformAdmin && (
                   <button className="hero-btn" style={{ background: "var(--success)", color: "#fff" }} onClick={() => setIsDbExplorerOpen(true)}>🛢️ БД</button>
@@ -239,7 +240,7 @@ export default function Storefront() {
               </div>
             </div>
 
-            {isStoreOwner ? (
+            {isStoreOwner || isStoreStaff ? (
               <SellerDashboard dict={dict} />
             ) : isPlatformAdmin ? (
               <PlatformAdminDashboard dict={dict} isPlatformAdmin={isPlatformAdmin} />
