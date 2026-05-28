@@ -86,6 +86,16 @@ export const systemSettings = pgTable("system_settings", {
   koreaShippingCostUsd: real("korea_shipping_cost_usd").default(30.0).notNull(),
 });
 
+// 7. Auth Codes (For Telegram cross-instance auth)
+export const authCodes = pgTable("auth_codes", {
+  code: text("code").primaryKey(),
+  telegramId: text("telegram_id"),
+  username: text("username"),
+  firstName: text("first_name"),
+  status: text("status", { enum: ["pending", "verified"] }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // --- Schema Relations ---
 
 export const usersRelations = relations(users, ({ many }) => ({

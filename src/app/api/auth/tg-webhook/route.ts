@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, authCodes } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { tgAuthCodes } from "@/lib/auth-codes";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -44,13 +43,26 @@ export async function POST(request: Request) {
 
         console.log(`✅ Telegram auth code received: ${rawCode} for user: ${username} (${tgUser.id})`);
 
-        // 1. Mark code as verified in our global in-memory cache
-        tgAuthCodes.set(rawCode, {
-          username: username,
-          telegramId: tgUser.id.toString(),
-          firstName: firstName,
-          status: "verified"
-        });
+        // 1. Mark code as verified in the DATABASE (Cross-instance support)
+        try {
+          await db.insert(authCodes).values({
+            code: rawCode,
+            username: username,
+            telegramId: tgUser.id.toString(),
+            firstName: firstName,
+            status: "verified"
+          }).onConflictDoUpdate({
+            target: authCodes.code,
+            set: {
+              username: username,
+              telegramId: tgUser.id.toString(),
+              firstName: firstName,
+              status: "verified"
+            }
+          });
+        } catch (authErr: any) {
+          console.error("Failed to save auth code in DB:", authErr.message);
+        }
 
         // 2. Try to sync/insert user in DB
         try {
@@ -75,11 +87,11 @@ export async function POST(request: Request) {
             await db.update(users).set({
               name: firstName,
               username: username,
-              userIndex: tgUser.id.toString(), // Update index too if it had 'C'
+              userIndex: tgUser.id.toString(), 
             }).where(eq(users.id, found[0].id));
           }
         } catch (dbErr: any) {
-          console.log("⚠️ Database is read-only (Vercel) during webhook user registration. Continuing in-memory.", dbErr.message);
+          console.log("⚠️ Webhook DB user sync error:", dbErr.message);
         }
 
         // 3. Send confirmation message to the user in Telegram

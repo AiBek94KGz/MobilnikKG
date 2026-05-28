@@ -1,34 +1,23 @@
 import { NextResponse } from "next/server";
-import { tgAuthCodes } from "@/lib/auth-codes";
+import { db } from "@/db";
+import { authCodes } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
 
-  if (!code || !code.startsWith("AUTH_")) {
-    return NextResponse.json({ success: false, error: "Invalid auth code format" }, { status: 400 });
+  if (!code) {
+    return NextResponse.json({ success: false, error: "No code provided" }, { status: 400 });
   }
 
-  // Retrieve code from cache
-  const cachedSession = tgAuthCodes.get(code);
+  // Check the DATABASE for the code status (Cross-instance support)
+  const result = await db.select().from(authCodes).where(eq(authCodes.code, code)).limit(1);
+  const cachedSession = result[0];
 
-  if (!cachedSession) {
-    // Register as pending session if it's the first check
-    console.log(`⏳ Registering new pending session code: ${code}`);
-    tgAuthCodes.set(code, {
-      username: "",
-      telegramId: "",
-      firstName: "",
-      status: "pending",
-    });
-    return NextResponse.json({ success: true, verified: false });
-  }
-
-  if (cachedSession.status === "verified") {
-    console.log(`🎉 Polling matched verified session code: ${code} for username: ${cachedSession.username}`);
-    
-    // Clean up code after successful retrieval to prevent replay attacks
-    tgAuthCodes.delete(code);
+  if (cachedSession && cachedSession.status === "verified") {
+    // 1. Success! Cleanup the code from DB (it's one-time use)
+    await db.delete(authCodes).where(eq(authCodes.code, code));
 
     return NextResponse.json({
       success: true,
@@ -38,6 +27,6 @@ export async function GET(request: Request) {
     });
   }
 
-  // Session still pending
+  // Session still pending or not found
   return NextResponse.json({ success: true, verified: false });
 }

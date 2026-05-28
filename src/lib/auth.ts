@@ -79,54 +79,63 @@ export const authOptions: NextAuthOptions = {
             .where(eq(users.telegramId, tgClean))
             .limit(1);
 
-          let user = found[0];
+          let userProfile = found[0];
 
-          if (!user) {
+          if (!userProfile) {
             const foundByUsername = await db.select().from(users).where(eq(users.username, tgClean)).limit(1);
-            user = foundByUsername[0];
+            userProfile = foundByUsername[0];
           }
           
-          if (!user) {
+          if (!userProfile) {
             const foundByIndex = await db.select().from(users).where(eq(users.userIndex, tgClean)).limit(1);
-            user = foundByIndex[0];
+            userProfile = foundByIndex[0];
           }
 
-          if (user) {
+          if (userProfile) {
             return {
-              id: user.id.toString(),
-              name: user.name,
-              email: user.email || `${user.username}@telegram.com`,
-              role: user.role,
-              username: user.username,
-              userIndex: user.userIndex,
+              id: userProfile.id.toString(),
+              name: userProfile.name,
+              email: userProfile.email || `${userProfile.username}@telegram.com`,
+              role: userProfile.role,
+              username: userProfile.username,
+              userIndex: userProfile.userIndex,
             };
           }
 
           // Not found: register new client user
-          let newId = 999999 + Math.floor(Math.random() * 1000000);
-          const index = tgClean; // Just the ID, no prefix
           try {
+            const index = tgClean; // Numeric ID
             const newInserted = await db.insert(users).values({
               name: tgClean,
               username: tgClean,
               telegramId: tgClean,
               userIndex: index, 
               role: "client",
-            }).returning({ id: users.id });
+            }).returning();
+            
             if (newInserted[0]) {
-              newId = newInserted[0].id;
+              const u = newInserted[0];
+              return {
+                id: u.id.toString(),
+                name: u.name,
+                email: `${u.username}@telegram.com`,
+                role: u.role,
+                username: u.username,
+                userIndex: u.userIndex,
+              };
             }
-          } catch (e) {
-            console.log("⚠️ Database is read-only (Vercel). Continuing with temporary session ID.");
+          } catch (e: any) {
+            console.error("❌ Auth Registration Error:", e.message);
           }
 
+          // Emergency fallback (session only, not persisted properly)
           return {
-            id: newId.toString(),
+            id: "temp_" + Date.now(),
             name: tgClean,
             email: `${tgClean}@telegram.com`,
             role: "client",
             username: tgClean,
-            userIndex: index,
+            userIndex: tgClean,
           };
         }
 

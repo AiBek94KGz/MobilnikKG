@@ -8,6 +8,13 @@
       "when": 1779945824851,
       "tag": "0000_old_talos",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779951732955,
+      "tag": "0001_living_cerise",
+      "breakpoints": true
     }
   ]
 }
