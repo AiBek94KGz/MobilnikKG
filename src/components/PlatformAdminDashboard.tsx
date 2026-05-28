@@ -17,10 +17,16 @@ export function PlatformAdminDashboard({ dict, isPlatformAdmin }: PlatformAdminD
   const [adminDubai, setAdminDubai] = useState(store.dubaiCost);
   const [adminKorea, setAdminKorea] = useState(store.koreaCost);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [totalStores, setTotalStores] = useState(0);
 
   useEffect(() => {
+    // Fetch users count
     fetch("/api/admin/users").then(r => r.json()).then(d => {
       if (d.success) setTotalUsers(d.users.length);
+    });
+    // Fetch stores count
+    fetch("/api/admin/stores").then(r => r.json()).then(d => {
+      if (d.success) setTotalStores(d.stores.length);
     });
   }, []);
 
@@ -35,7 +41,7 @@ export function PlatformAdminDashboard({ dict, isPlatformAdmin }: PlatformAdminD
         </div>
         <div className="metric-box">
           <div className="metric-title">Активных магазинов</div>
-          <div className="metric-val">{store.orders.length > 0 ? "..." : "Загрузка"} (в разработке)</div>
+          <div className="metric-val">{totalStores}</div>
         </div>
         <div className="metric-box">
           <div className="metric-title">Активных товаров</div>
