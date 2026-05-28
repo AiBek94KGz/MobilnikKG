@@ -49,8 +49,8 @@ export async function GET(request: Request) {
     console.log("⚠️ Database is read-only (Vercel). Continuing with simulated session.");
   }
 
-  // 3. Redirect back with success
-  const response = NextResponse.redirect(new URL(`/?auth_success=true&username=${username}`, request.url));
+  // 3. Redirect back with success (Pass numeric ID as primary identifier)
+  const response = NextResponse.redirect(new URL(`/?auth_success=true&username=${tgId}`, request.url));
   
   return response;
 }

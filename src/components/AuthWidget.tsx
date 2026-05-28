@@ -38,10 +38,12 @@ export function AuthWidget({ isOpen, onClose }: AuthWidgetProps) {
         const res = await fetch(`/api/auth/tg-poll?code=${tgAuthSessionCode}`);
         const data = await res.json();
         
-        if (data.success && data.verified && data.username) {
+        if (data.success && data.verified) {
           clearInterval(intervalId);
           setIsPollingTgAuth(false);
-          store.loginTelegram(data.username);
+          // Pass telegramId if available, fallback to username
+          const identifier = data.telegramId || data.username;
+          store.loginTelegram(identifier);
           setAuthMethod(null);
           onClose();
         }

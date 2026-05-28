@@ -34,6 +34,7 @@ export async function GET(request: Request) {
       success: true,
       verified: true,
       username: cachedSession.username,
+      telegramId: cachedSession.telegramId,
     });
   }
 
