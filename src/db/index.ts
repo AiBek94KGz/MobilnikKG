@@ -10,11 +10,11 @@ if (!connectionString) {
 }
 
 // Configuration for Supabase
-const clientConfig = {
+const clientConfig: any = {
   ssl: "require",
   connect_timeout: 15,
-  max: 5, // Tighter connection limit for Vercel functions
-  prepare: false, // Required for some transaction poolers
+  max: 5,
+  prepare: false,
 };
 
 export const client = postgres(connectionString || "postgresql://not-set-placeholder", clientConfig);
