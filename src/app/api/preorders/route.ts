@@ -6,6 +6,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { sendTelegramNotification } from "@/lib/telegram";
 
+import { getUserIdFromSession, formatTelegramOrderMessage } from "@/lib/api-utils";
+
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   const userRole = (session?.user as any)?.role || "client";
@@ -51,17 +53,7 @@ export async function POST(request: Request) {
     const totalKGS = Math.round(totalUsd * exchangeRate);
 
     // Save order
-    let userIdValue: number | null = null;
-    if (session?.user) {
-      const matchedUsers = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, (session.user as any).username))
-        .limit(1);
-      if (matchedUsers.length > 0) {
-        userIdValue = matchedUsers[0].id;
-      }
-    }
+    const userIdValue = await getUserIdFromSession(session);
 
     const newOrder = await db.insert(orders).values({
       userId: userIdValue,
@@ -87,13 +79,16 @@ export async function POST(request: Request) {
     const buyerPhone = session?.user?.email && session?.user?.email.startsWith("+") ? session?.user.email : "Нет телефона";
     const buyerUsername = (session?.user as any)?.username ? `@${(session?.user as any).username}` : "Нет";
 
-    const hubLabel = originHub === "dubai" ? "Предзаказ Дубай" : "Предзаказ Корея";
-
-    const tgMsg = `🔔 Новый Предзаказ!
-👤 Покупатель: <b>${buyerName}</b> (${buyerUsername} / ${buyerPhone})
-📦 Товар: ${product.model} x ${quantity}
-💰 Сумма: <b>$${totalUsd}</b> / <b>${totalKGS.toLocaleString("ru-RU")} сом</b>
-📍 Тип: ${hubLabel}`;
+    const itemsDescription = `${product.model} x ${quantity}`;
+    const tgMsg = formatTelegramOrderMessage({
+      type: "preorder",
+      buyerName,
+      buyerUsername,
+      buyerPhone,
+      itemsDescription,
+      totalUsd,
+      totalKGS,
+    });
 
     const tgResult = await sendTelegramNotification(tgMsg);
 

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { products } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { products, stores } from "@/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+
+import { validateSession, getUserIdFromSession } from "@/lib/api-utils";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -11,26 +13,39 @@ export async function GET(request: Request) {
   const statusParam = searchParams.get("status");
   const ownerParam = searchParams.get("owner");
 
-  // Get active session
-  const session = await getServerSession(authOptions);
-  const isWholesale =
-    session?.user &&
-    ((session.user as any).role === "wholesale" ||
-      (session.user as any).role === "owner");
+  const { authorized, session, role } = await validateSession();
+  const isWholesale = session?.user && 
+    ((role === "wholesale") || (role === "owner"));
 
   try {
     let queryConditions = [];
 
     if (ownerParam === "mine") {
-      if (!session?.user) {
+      if (!authorized || !session) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
-      const role = (session.user as any).role;
       if (role !== "store_owner" && role !== "owner" && role !== "admin") {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
-      const ownerId = parseInt((session.user as any).id, 10);
-      queryConditions.push(eq(products.ownerId, isNaN(ownerId) ? 2 : ownerId));
+      const userId = await getUserIdFromSession(session);
+      if (!userId) return NextResponse.json({ products: [] });
+      
+      // Find stores owned by this user
+      const userStores = await db.select({ id: stores.id }).from(stores).where(eq(stores.ownerId, userId));
+      const storeIds = userStores.map(s => s.id);
+      
+      if (storeIds.length === 0 && role !== "owner" && role !== "admin") {
+        return NextResponse.json({ products: [] });
+      }
+
+      if (role === "owner" || role === "admin") {
+         // Admins see everything when ownerParam=mine? 
+         // Or maybe we should still filter by their own stores? 
+         // For now, let's keep it consistent with "mine" meaning "owned by me"
+         queryConditions.push(eq(products.ownerId, userId));
+      } else {
+         queryConditions.push(sql`${products.storeId} IN (${sql.join(storeIds, sql`, `)})`);
+      }
     } else {
       // Filter active items for public view
       queryConditions.push(eq(products.isActive, true));
@@ -88,7 +103,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { brand, model, basePriceUsd, wholesalePriceUsd, stockQuantity, statusTag, imageUrl, description, isActive, batteryCapacity } = body;
+    const { brand, model, basePriceUsd, wholesalePriceUsd, stockQuantity, statusTag, imageUrl, description, isActive, batteryCapacity, storeId } = body;
 
     if (!brand || !model || basePriceUsd === undefined || wholesalePriceUsd === undefined || stockQuantity === undefined || !imageUrl || !description) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -99,10 +114,29 @@ export async function POST(request: Request) {
     }
 
     const sessionUserId = parseInt((session.user as any).id, 10);
-    const ownerId = isNaN(sessionUserId) ? 2 : sessionUserId;
+    
+    // Find or verify storeId
+    let finalStoreId = storeId ? parseInt(storeId, 10) : null;
+    if (!finalStoreId) {
+      const userStores = await db.select().from(stores).where(eq(stores.ownerId, sessionUserId)).limit(1);
+      if (userStores.length > 0) {
+        finalStoreId = userStores[0].id;
+      }
+    } else {
+      // Verify user owns this store
+      const verifyStore = await db.select().from(stores).where(and(eq(stores.id, finalStoreId), eq(stores.ownerId, sessionUserId))).limit(1);
+      if (verifyStore.length === 0 && role !== "owner" && role !== "admin") {
+        return NextResponse.json({ error: "Unauthorized store ID" }, { status: 403 });
+      }
+    }
+
+    if (!finalStoreId && role !== "owner" && role !== "admin") {
+       return NextResponse.json({ error: "Store required" }, { status: 400 });
+    }
 
     const inserted = await db.insert(products).values({
-      ownerId: ownerId,
+      ownerId: sessionUserId,
+      storeId: finalStoreId,
       brand: brand as any,
       model,
       basePriceUsd: parseInt(basePriceUsd, 10),
@@ -149,7 +183,18 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    if (role !== "owner" && role !== "admin" && found[0].ownerId !== userId) {
+    let isAuthorized = role === "owner" || role === "admin";
+    if (!isAuthorized) {
+       // Check if user owns the store this product belongs to
+       if (found[0].storeId) {
+         const storeCheck = await db.select().from(stores).where(and(eq(stores.id, found[0].storeId), eq(stores.ownerId, userId))).limit(1);
+         if (storeCheck.length > 0) isAuthorized = true;
+       } else if (found[0].ownerId === userId) {
+         isAuthorized = true;
+       }
+    }
+
+    if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -200,7 +245,18 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
-    if (role !== "owner" && role !== "admin" && found[0].ownerId !== userId) {
+    let isAuthorized = role === "owner" || role === "admin";
+    if (!isAuthorized) {
+       // Check if user owns the store this product belongs to
+       if (found[0].storeId) {
+         const storeCheck = await db.select().from(stores).where(and(eq(stores.id, found[0].storeId), eq(stores.ownerId, userId))).limit(1);
+         if (storeCheck.length > 0) isAuthorized = true;
+       } else if (found[0].ownerId === userId) {
+         isAuthorized = true;
+       }
+    }
+
+    if (!isAuthorized) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

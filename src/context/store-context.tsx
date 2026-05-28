@@ -88,7 +88,7 @@ interface StoreContextType {
   // Modal Auth
   isAuthOpen: boolean;
   setAuthOpen: (open: boolean) => void;
-  loginGoogle: (email: string) => Promise<void>;
+  loginEmail: (email: string, password?: string) => Promise<void>;
   loginTelegram: (username: string) => Promise<void>;
   logout: () => void;
 
@@ -337,10 +337,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Google/Telegram Authentication Methods
-  const loginGoogle = async (email: string) => {
+  // Email/Telegram Authentication Methods
+  const loginEmail = async (email: string, password?: string) => {
     await signIn("credentials", {
       email,
+      password,
       redirect: false,
     });
     setAuthOpen(false);
@@ -394,7 +395,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         refetchAdminData: fetchAdminData,
         isAuthOpen,
         setAuthOpen,
-        loginGoogle,
+        loginEmail,
         loginTelegram,
         logout,
         submitPreorder,

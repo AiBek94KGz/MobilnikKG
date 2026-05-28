@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { orders, orderItems, products, users } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { orders, orderItems, products, users, stores } from "@/db/schema";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { sendTelegramNotification } from "@/lib/telegram";
+
+import { getUserIdFromSession, formatTelegramOrderMessage } from "@/lib/api-utils";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -14,12 +16,14 @@ export async function GET() {
   }
 
   const role = (session.user as any).role;
-  if (role !== "owner" && role !== "admin") {
+  const userId = await getUserIdFromSession(session);
+
+  if (role !== "owner" && role !== "admin" && role !== "store_owner") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
-    const list = await db
+    let query = db
       .select({
         id: orders.id,
         totalUsd: orders.totalUsd,
@@ -35,12 +39,31 @@ export async function GET() {
         quantity: orderItems.quantity,
         productBrand: products.brand,
         productModel: products.model,
+        storeId: products.storeId,
       })
       .from(orders)
       .leftJoin(users, eq(orders.userId, users.id))
       .leftJoin(orderItems, eq(orders.id, orderItems.orderId))
-      .leftJoin(products, eq(orderItems.productId, products.id))
-      .orderBy(desc(orders.id));
+      .leftJoin(products, eq(orderItems.productId, products.id));
+
+    if (role === "store_owner" && userId) {
+      // Find stores owned by this user
+      const userStores = await db.select({ id: stores.id }).from(stores).where(eq(stores.ownerId, userId));
+      const storeIds = userStores.map(s => s.id);
+      
+      if (storeIds.length === 0) {
+        return NextResponse.json({ orders: [] });
+      }
+
+      const orderIdsSubquery = db.select({ orderId: orderItems.orderId })
+        .from(orderItems)
+        .leftJoin(products, eq(orderItems.productId, products.id))
+        .where(inArray(products.storeId, storeIds));
+      
+      query = query.where(inArray(orders.id, orderIdsSubquery));
+    }
+
+    const list = await query.orderBy(desc(orders.id));
 
     const orderMap = new Map<number, any>();
     for (const row of list) {
@@ -128,17 +151,7 @@ export async function POST(request: Request) {
     }
 
     // Decrement stock and save order
-    let userIdValue: number | null = null;
-    if (session?.user) {
-      const matchedUsers = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, (session.user as any).username))
-        .limit(1);
-      if (matchedUsers.length > 0) {
-        userIdValue = matchedUsers[0].id;
-      }
-    }
+    const userIdValue = await getUserIdFromSession(session);
 
     const newOrder = await db.insert(orders).values({
       userId: userIdValue,
@@ -179,11 +192,15 @@ export async function POST(request: Request) {
     const buyerUsername = (session?.user as any)?.username ? `@${(session?.user as any).username}` : "Нет";
 
     const totalKGS = Math.round(totalUsd * exchangeRate);
-    const tgMsg = `🔔 Новый Заказ!
-👤 Покупатель: <b>${buyerName}</b> (${buyerUsername} / ${buyerPhone})
-📦 Товар: ${itemsDescription}
-💰 Сумма: <b>$${totalUsd}</b> / <b>${totalKGS.toLocaleString("ru-RU")} сом</b>
-📍 Тип: Прямая продажа (В наличии)`;
+    const tgMsg = formatTelegramOrderMessage({
+      type: "order",
+      buyerName,
+      buyerUsername,
+      buyerPhone,
+      itemsDescription,
+      totalUsd,
+      totalKGS,
+    });
 
     const tgResult = await sendTelegramNotification(tgMsg);
 

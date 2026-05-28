@@ -280,34 +280,127 @@ header {
 }
 
 .hero-banner {
-  background-color: var(--card);
+  background: linear-gradient(135deg, #2b2d30 0%, #1e1f22 100%);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 3rem;
+  border-radius: 24px;
+  padding: 4rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   position: relative;
   overflow: hidden;
   gap: 2rem;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+}
+
+.hero-banner::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(53, 116, 240, 0.1) 0%, transparent 70%);
+  z-index: 1;
 }
 
 .hero-content {
-  max-width: 50%;
+  max-width: 60%;
+  position: relative;
+  z-index: 2;
 }
 
 .hero-title {
-  font-size: 2.5rem;
+  font-size: 3rem;
   font-weight: 800;
-  line-height: 1.15;
-  margin-bottom: 1rem;
-  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.04em;
+  background: linear-gradient(to right, #fff, #90949d);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .hero-subtitle {
   color: var(--text-secondary);
-  font-size: 1.125rem;
+  font-size: 1.25rem;
+  margin-bottom: 2rem;
+  line-height: 1.6;
+}
+
+.hero-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(237, 212, 86, 0.1);
+  color: #edd456;
+  padding: 6px 12px;
+  border-radius: 100px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
   margin-bottom: 1.5rem;
+  border: 1px solid rgba(237, 212, 86, 0.2);
+}
+
+.hero-visual {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hero-visual-logo {
+  width: 280px;
+  height: 280px;
+  background: #1e1f22;
+  border-radius: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #edd456;
+  box-shadow: 0 0 30px rgba(237, 212, 86, 0.15), inset 0 0 20px rgba(237, 212, 86, 0.05);
+  position: relative;
+  transform: rotate(5deg);
+  transition: transform 0.3s ease;
+}
+
+.hero-visual-logo:hover {
+  transform: rotate(0deg) scale(1.05);
+}
+
+.logo-ao {
+  font-size: 5rem;
+  font-weight: 900;
+  color: #edd456;
+  line-height: 1;
+}
+
+.logo-text {
+  font-size: 1.1rem;
+  color: #fff;
+  font-weight: 600;
+  margin-top: -5px;
+}
+
+.logo-cart {
+  position: absolute;
+  bottom: -20px;
+  right: -20px;
+  width: 80px;
+  height: 80px;
+  background: #edd456;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1e1f22;
+  font-size: 2rem;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+  transform: rotate(-10deg);
 }
 
 .hero-btn {
@@ -425,31 +518,31 @@ header {
 }
 
 .product-img-wrapper {
-  background-color: #ffffff; /* Studio White Background */
+  background-color: #ffffff; /* Pure Studio White */
   border-radius: 8px;
-  padding: 0.75rem;
+  padding: 0.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 240px; /* Slightly taller for better presence */
+  height: 240px;
   margin-bottom: 1.25rem;
   position: relative;
   overflow: hidden;
   transition: var(--transition);
-  border: 1px solid var(--border);
+  /* Removed border to prevent "box" look */
 }
 
 [data-theme="dark"] .product-img-wrapper {
-  background-color: #ffffff; /* Keep white even in dark mode for products or choose deep gray? User said white. */
+  background-color: #ffffff; 
 }
 
 .product-img-wrapper .product-main-img {
-  max-width: 90%;
-  max-height: 90%;
+  max-width: 100%;
+  max-height: 100%;
   width: auto;
   height: auto;
   object-fit: contain;
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.08)); /* Subtle shadow for white bg */
+  mix-blend-mode: multiply; /* Ensures image white background blends into container */
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -463,7 +556,7 @@ header {
 }
 
 .product-card:hover .product-main-img {
-  transform: scale(1.08) translateY(-5px); /* Elegant pop-up effect */
+  transform: none; /* Disabled zoom effect */
 }
 
 .product-status-tag {

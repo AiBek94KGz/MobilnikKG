@@ -65,17 +65,29 @@ export async function POST(request: Request) {
 
       const cleanQuery = query.trim();
       const isWriteQuery = /^(insert|update|delete|drop|alter|create|replace)/i.test(cleanQuery);
+      const hasReturning = /returning/i.test(cleanQuery);
 
       try {
         const start = performance.now();
-        const result = sqlite.prepare(cleanQuery).all();
+        let result;
+        let message = "";
+
+        if (isWriteQuery && !hasReturning) {
+          const info = sqlite.prepare(cleanQuery).run();
+          result = info;
+          message = `Запрос выполнен успешно! Изменено строк: ${info.changes}, ID последней вставки: ${info.lastInsertRowid}`;
+        } else {
+          result = sqlite.prepare(cleanQuery).all();
+          message = "Запрос выполнен успешно!";
+        }
+
         const elapsed = (performance.now() - start).toFixed(2);
 
         return NextResponse.json({
           success: true,
           result,
           elapsed,
-          message: isWriteQuery ? "Запрос на запись выполнен успешно!" : "Запрос на чтение выполнен успешно!",
+          message,
         });
       } catch (err: any) {
         let friendlyError = err.message;

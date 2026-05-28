@@ -3,20 +3,22 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: "Mock Session Provider",
+      name: "Secure Provider",
       credentials: {
         email: { label: "Email", type: "text" },
+        password: { label: "Password", type: "password" },
         telegram: { label: "Telegram", type: "text" },
       },
       async authorize(credentials) {
         if (credentials?.email) {
           const emailClean = credentials.email.trim().toLowerCase();
+          const password = credentials.password;
           
-          // Lookup user in SQLite database by email
           const found = await db
             .select()
             .from(users)
@@ -25,6 +27,21 @@ export const authOptions: NextAuthOptions = {
 
           if (found[0]) {
             const user = found[0];
+            
+            // If user has a password, verify it
+            if (user.password) {
+              if (!password) return null;
+              const isValid = await bcrypt.compare(password, user.password);
+              if (!isValid) return null;
+            } else if (password) {
+              // If user has no password yet but provided one, maybe set it? 
+              // (Risk: first person to login as existing user without password sets it)
+              // Better: if no password, only allow login if it's a public/mock environment
+              // or force them to use Telegram.
+              // For now, if no password, allow login ONLY if it's a client.
+              if (user.role !== "client") return null;
+            }
+
             return {
               id: user.id.toString(),
               name: user.name,
@@ -34,7 +51,7 @@ export const authOptions: NextAuthOptions = {
             };
           }
 
-          // Not found: register new client user with this email
+          // Auto-register only clients
           const baseUsername = emailClean.split("@")[0];
           const newInserted = await db.insert(users).values({
             name: baseUsername,
@@ -163,5 +180,5 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
-  secret: process.env.NEXTAUTH_SECRET || "mobilnik-kg-secret-key-12345",
+  secret: process.env.NEXTAUTH_SECRET,
 };

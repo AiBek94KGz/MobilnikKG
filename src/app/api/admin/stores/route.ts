@@ -1,55 +1,52 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, products } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { users, products, stores } from "@/db/schema";
+import { eq, sql, and } from "drizzle-orm";
+import { validateSession } from "@/lib/api-utils";
+import bcrypt from "bcryptjs";
 
 export async function GET(request: Request) {
   try {
-    // 1. Verify credentials and session
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { authorized, response } = await validateSession(["owner", "admin"]);
+    if (!authorized) return response;
 
-    const role = (session.user as any).role;
-    if (role !== "owner" && role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
-    }
-
-    // 2. Get all store owners
+    // Join stores with users (owners)
     const list = await db
-      .select()
-      .from(users)
-      .where(eq(users.role, "store_owner"));
+      .select({
+        id: stores.id,
+        name: stores.name,
+        slug: stores.slug,
+        description: stores.description,
+        logoUrl: stores.logoUrl,
+        status: stores.status,
+        createdAt: stores.createdAt,
+        ownerName: users.name,
+        ownerUsername: users.username,
+        ownerEmail: users.email,
+        ownerPhone: users.phone,
+        ownerId: users.id,
+      })
+      .from(stores)
+      .leftJoin(users, eq(stores.ownerId, users.id));
 
-    // 3. Count products per owner
+    // Count products per store
     const productCounts = await db
       .select({
-        ownerId: products.ownerId,
+        storeId: products.storeId,
         count: sql<number>`count(*)`,
       })
       .from(products)
-      .groupBy(products.ownerId);
+      .groupBy(products.storeId);
 
-    // 4. Combine stores and product counts
-    const stores = list.map((store) => {
-      const matched = productCounts.find((pc) => pc.ownerId === store.id);
+    const formattedStores = list.map((s) => {
+      const matched = productCounts.find((pc) => pc.storeId === s.id);
       return {
-        id: store.id,
-        name: store.name,
-        username: store.username,
-        phone: store.phone,
-        email: store.email,
-        userIndex: store.userIndex,
-        telegramId: store.telegramId,
-        createdAt: store.createdAt,
+        ...s,
         productCount: matched ? matched.count : 0,
       };
     });
 
-    return NextResponse.json({ success: true, stores });
+    return NextResponse.json({ success: true, stores: formattedStores });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || "Internal server error" }, { status: 500 });
   }
@@ -57,61 +54,67 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    // 1. Verify credentials and session
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { authorized, response } = await validateSession(["owner", "admin"]);
+    if (!authorized) return response;
 
-    const role = (session.user as any).role;
-    if (role !== "owner" && role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
-    }
-
-    // 2. Parse body
     const body = await request.json();
-    const { name, username, phone, email } = body;
+    const { name, username, phone, email, description, password } = body;
 
     if (!name || !username) {
       return NextResponse.json({ success: false, error: "Название и юзернейм обязательны" }, { status: 400 });
     }
 
-    // 3. Generate unique userIndex starting with M + 9 random digits
-    let userIndex = "";
-    let isUnique = false;
-    let attempts = 0;
-    while (!isUnique && attempts < 100) {
-      attempts++;
-      const randomDigits = Math.floor(100000000 + Math.random() * 900000000); // 9 digits
-      userIndex = `M${randomDigits}`;
+    // 1. Check if user exists or create new store owner user
+    let user;
+    const existingUser = await db.select().from(users).where(eq(users.username, username.trim().replace("@", ""))).limit(1);
+    
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
-      const existing = await db
-        .select()
-        .from(users)
-        .where(eq(users.userIndex, userIndex))
-        .limit(1);
-
-      if (existing.length === 0) {
-        isUnique = true;
+    if (existingUser.length > 0) {
+      user = existingUser[0];
+      // Update role and password if needed
+      const updateData: any = {};
+      if (user.role !== "store_owner" && user.role !== "owner" && user.role !== "admin") {
+        updateData.role = "store_owner";
       }
-    }
+      if (hashedPassword) {
+        updateData.password = hashedPassword;
+      }
+      if (Object.keys(updateData).length > 0) {
+        await db.update(users).set(updateData).where(eq(users.id, user.id));
+      }
+    } else {
+      // Generate userIndex
+      let userIndex = "";
+      let isUnique = false;
+      while (!isUnique) {
+        const randomDigits = Math.floor(100000000 + Math.random() * 900000000);
+        userIndex = `M${randomDigits}`;
+        const checkIndex = await db.select().from(users).where(eq(users.userIndex, userIndex)).limit(1);
+        if (checkIndex.length === 0) isUnique = true;
+      }
 
-    if (!isUnique) {
-      return NextResponse.json({ success: false, error: "Не удалось сгенерировать уникальный индекс магазина" }, { status: 500 });
-    }
-
-    // 4. Create new store owner
-    const newStore = await db
-      .insert(users)
-      .values({
+      const insertedUser = await db.insert(users).values({
         name: name.trim(),
         username: username.trim().replace("@", ""),
         phone: phone ? phone.trim() : null,
         email: email ? email.trim() : null,
         userIndex,
         role: "store_owner",
-      })
-      .returning();
+        password: hashedPassword,
+      }).returning();
+      user = insertedUser[0];
+    }
+
+    // 2. Create the store
+    const slug = username.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Math.floor(Math.random() * 1000);
+    const newStore = await db.insert(stores).values({
+      name: name.trim(),
+      slug,
+      ownerId: user.id,
+      description: description || null,
+      status: "active",
+    }).returning();
 
     return NextResponse.json({ success: true, store: newStore[0] });
   } catch (err: any) {
@@ -121,7 +124,6 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    // 1. Verify credentials and session
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -132,24 +134,22 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
     }
 
-    // 2. Parse body
     const body = await request.json();
-    const { id, name, username, phone, email } = body;
+    const { id, name, description, status, logoUrl } = body;
 
-    if (!id || !name || !username) {
-      return NextResponse.json({ success: false, error: "ID, Название и юзернейм обязательны" }, { status: 400 });
+    if (!id || !name) {
+      return NextResponse.json({ success: false, error: "ID и Название обязательны" }, { status: 400 });
     }
 
-    // 3. Update store
     const updated = await db
-      .update(users)
+      .update(stores)
       .set({
         name: name.trim(),
-        username: username.trim().replace("@", ""),
-        phone: phone ? phone.trim() : null,
-        email: email ? email.trim() : null,
+        description: description || null,
+        status: status || "active",
+        logoUrl: logoUrl || null,
       })
-      .where(eq(users.id, id))
+      .where(eq(stores.id, id))
       .returning();
 
     if (updated.length === 0) {
@@ -164,18 +164,9 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    // 1. Verify credentials and session
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { authorized, response } = await validateSession(["owner", "admin"]);
+    if (!authorized) return response;
 
-    const role = (session.user as any).role;
-    if (role !== "owner" && role !== "admin") {
-      return NextResponse.json({ error: "Forbidden: Admins only" }, { status: 403 });
-    }
-
-    // 2. Parse query param id
     const { searchParams } = new URL(request.url);
     const idStr = searchParams.get("id");
     if (!idStr) {
@@ -183,11 +174,11 @@ export async function DELETE(request: Request) {
     }
     const id = parseInt(idStr, 10);
 
-    // 3. Delete store products first
-    await db.delete(products).where(eq(products.ownerId, id));
+    // 1. Delete store products
+    await db.delete(products).where(eq(products.storeId, id));
 
-    // 4. Delete store owner
-    const deleted = await db.delete(users).where(eq(users.id, id)).returning();
+    // 2. Delete the store
+    const deleted = await db.delete(stores).where(eq(stores.id, id)).returning();
 
     if (deleted.length === 0) {
       return NextResponse.json({ success: false, error: "Магазин не найден" }, { status: 404 });

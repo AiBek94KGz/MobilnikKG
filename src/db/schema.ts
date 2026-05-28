@@ -10,16 +10,30 @@ export const users = sqliteTable("users", {
   name: text("name").notNull(),
   username: text("username").notNull(),
   phone: text("phone"),
+  password: text("password"), // Secure hashed password
   userIndex: text("user_index").unique(), // M-ID, O-ID, C-ID
   role: text("role", { enum: ["owner", "admin", "wholesale", "client", "store_owner", "store_staff"] }).default("client").notNull(),
   parentId: integer("parent_id"), // For store owners adding staff
   createdAt: text("created_at").default("CURRENT_TIMESTAMP").notNull(),
 });
 
+// 1.1 Stores Table
+export const stores = sqliteTable("stores", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  ownerId: integer("owner_id").references(() => users.id).notNull(),
+  name: text("name").notNull(),
+  slug: text("slug").unique().notNull(),
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  status: text("status", { enum: ["pending", "active", "blocked"] }).default("pending").notNull(),
+  createdAt: text("created_at").default("CURRENT_TIMESTAMP").notNull(),
+});
+
 // 2. Products Table
 export const products = sqliteTable("products", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  ownerId: integer("owner_id").references(() => users.id), // Which store/user owns this product
+  ownerId: integer("owner_id").references(() => users.id), // Legacy: Which user owns this (fallback)
+  storeId: integer("store_id").references(() => stores.id), // NEW: Which store owns this product
   brand: text("brand", { enum: ["Apple", "Samsung", "Xiaomi", "Feature Phones"] }).notNull(),
   model: text("model").notNull(),
   basePriceUsd: integer("base_price_usd").notNull(),
