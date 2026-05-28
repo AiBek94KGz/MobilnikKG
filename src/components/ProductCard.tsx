@@ -92,52 +92,54 @@ export function ProductCard({
               onClick={handlePrev}
               style={{
                 position: "absolute",
-                left: "6px",
+                left: "10px",
                 top: "50%",
-                transform: "translateY(-50%)",
-                background: "rgba(30, 31, 34, 0.75)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
+                transform: `translateY(-50%) ${isHovered ? 'scale(1)' : 'scale(0.9)'}`,
+                background: "#ffffff",
+                border: "none",
+                color: "#1e1f22",
                 borderRadius: "50%",
-                width: "22px",
-                height: "22px",
+                width: "34px",
+                height: "34px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
                 zIndex: 2,
-                fontSize: "0.7rem",
-                fontWeight: "bold",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+                boxShadow: "0 4px 15px rgba(0,0,0,0.12)",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                opacity: isHovered ? 1 : 0,
+                pointerEvents: isHovered ? "auto" : "none"
               }}
             >
-              &larr;
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
             <button 
               className="carousel-btn-next" 
               onClick={handleNext}
               style={{
                 position: "absolute",
-                right: "6px",
+                right: "10px",
                 top: "50%",
-                transform: "translateY(-50%)",
-                background: "rgba(30, 31, 34, 0.75)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
+                transform: `translateY(-50%) ${isHovered ? 'scale(1)' : 'scale(0.9)'}`,
+                background: "#ffffff",
+                border: "none",
+                color: "#1e1f22",
                 borderRadius: "50%",
-                width: "22px",
-                height: "22px",
+                width: "34px",
+                height: "34px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
                 zIndex: 2,
-                fontSize: "0.7rem",
-                fontWeight: "bold",
-                boxShadow: "0 2px 4px rgba(0,0,0,0.2)"
+                boxShadow: "0 4px 15px rgba(0,0,0,0.12)",
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                opacity: isHovered ? 1 : 0,
+                pointerEvents: isHovered ? "auto" : "none"
               }}
             >
-              &rarr;
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
             <div style={{
               position: "absolute",

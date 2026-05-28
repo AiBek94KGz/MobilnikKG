@@ -280,28 +280,22 @@ header {
 }
 
 .hero-banner {
-  background: linear-gradient(135deg, #2b2d30 0%, #1e1f22 100%);
+  background-color: var(--background-card);
   border: 1px solid var(--border);
   border-radius: 24px;
-  padding: 4rem;
+  padding: 3.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   position: relative;
   overflow: hidden;
   gap: 2rem;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-.hero-banner::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  right: -10%;
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(53, 116, 240, 0.1) 0%, transparent 70%);
-  z-index: 1;
+[data-theme="light"] .hero-banner {
+  background-color: #ffffff;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.04);
 }
 
 .hero-content {
@@ -311,96 +305,49 @@ header {
 }
 
 .hero-title {
-  font-size: 3rem;
+  font-size: 2.75rem;
   font-weight: 800;
-  line-height: 1.1;
-  margin-bottom: 1.25rem;
-  letter-spacing: -0.04em;
-  background: linear-gradient(to right, #fff, #90949d);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  line-height: 1.15;
+  margin-bottom: 1rem;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
 }
 
-.hero-subtitle {
+.heroSubtitle {
   color: var(--text-secondary);
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   margin-bottom: 2rem;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .hero-brand-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(237, 212, 86, 0.1);
-  color: #edd456;
+  background: var(--background-soft);
+  color: var(--accent);
   padding: 6px 12px;
   border-radius: 100px;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: 1.5rem;
-  border: 1px solid rgba(237, 212, 86, 0.2);
+  margin-bottom: 1.25rem;
+  border: 1px solid var(--border);
 }
 
-.hero-visual {
-  position: relative;
-  z-index: 2;
+.hero-image {
+  flex-shrink: 0;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-.hero-visual-logo {
-  width: 280px;
-  height: 280px;
-  background: #1e1f22;
-  border-radius: 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #edd456;
-  box-shadow: 0 0 30px rgba(237, 212, 86, 0.15), inset 0 0 20px rgba(237, 212, 86, 0.05);
-  position: relative;
-  transform: rotate(5deg);
-  transition: transform 0.3s ease;
-}
-
-.hero-visual-logo:hover {
-  transform: rotate(0deg) scale(1.05);
-}
-
-.logo-ao {
-  font-size: 5rem;
-  font-weight: 900;
-  color: #edd456;
-  line-height: 1;
-}
-
-.logo-text {
-  font-size: 1.1rem;
-  color: #fff;
-  font-weight: 600;
-  margin-top: -5px;
-}
-
-.logo-cart {
-  position: absolute;
-  bottom: -20px;
-  right: -20px;
-  width: 80px;
-  height: 80px;
-  background: #edd456;
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #1e1f22;
-  font-size: 2rem;
-  box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-  transform: rotate(-10deg);
+.hero-subtitle {
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  margin-bottom: 2rem;
+  line-height: 1.5;
 }
 
 .hero-btn {

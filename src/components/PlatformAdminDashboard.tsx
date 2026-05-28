@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useStore } from "@/context/store-context";
 import { AdminStores } from "./AdminStores";
+import { AdminUsers } from "./AdminUsers";
 
 interface PlatformAdminDashboardProps {
   dict: any;
@@ -11,10 +12,17 @@ interface PlatformAdminDashboardProps {
 
 export function PlatformAdminDashboard({ dict, isPlatformAdmin }: PlatformAdminDashboardProps) {
   const store = useStore();
-  const [adminTab, setAdminTab] = useState<"orders" | "stores" | "settings">("orders");
+  const [adminTab, setAdminTab] = useState<"users" | "stores" | "settings">("users");
   const [adminRate, setAdminRate] = useState(store.exchangeRate);
   const [adminDubai, setAdminDubai] = useState(store.dubaiCost);
   const [adminKorea, setAdminKorea] = useState(store.koreaCost);
+  const [totalUsers, setTotalUsers] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/admin/users").then(r => r.json()).then(d => {
+      if (d.success) setTotalUsers(d.users.length);
+    });
+  }, []);
 
   if (!isPlatformAdmin) return null;
 
@@ -22,14 +30,12 @@ export function PlatformAdminDashboard({ dict, isPlatformAdmin }: PlatformAdminD
     <div className="platform-admin-dashboard">
       <div className="metrics-row">
         <div className="metric-box">
-          <div className="metric-title">Сумма всех заказов</div>
-          <div className="metric-val">
-            ${store.orders.reduce((sum, o) => sum + o.totalUsd, 0).toLocaleString()}
-          </div>
+          <div className="metric-title">Всего пользователей</div>
+          <div className="metric-val">{totalUsers}</div>
         </div>
         <div className="metric-box">
-          <div className="metric-title">Всего заказов</div>
-          <div className="metric-val">{store.orders.length}</div>
+          <div className="metric-title">Активных магазинов</div>
+          <div className="metric-val">{store.orders.length > 0 ? "..." : "Загрузка"} (в разработке)</div>
         </div>
         <div className="metric-box">
           <div className="metric-title">Активных товаров</div>
@@ -42,8 +48,8 @@ export function PlatformAdminDashboard({ dict, isPlatformAdmin }: PlatformAdminD
       </div>
 
       <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", borderBottom: "1px solid var(--border)", paddingBottom: "0" }}>
-        {(["orders", "stores", "settings"] as const).map((tab) => {
-          const labels = { orders: "📋 Заказы", stores: "🏪 Магазины", settings: "⚙️ Настройки" };
+        {(["users", "stores", "settings"] as const).map((tab) => {
+          const labels = { users: "👥 Пользователи", stores: "🏪 Магазины", settings: "⚙️ Настройки" };
           return (
             <button
               key={tab}
@@ -67,41 +73,8 @@ export function PlatformAdminDashboard({ dict, isPlatformAdmin }: PlatformAdminD
         })}
       </div>
 
-      {adminTab === "orders" && (
-        <div className="admin-card">
-          <h3>{dict.adminRecentOrders}</h3>
-          <div className="admin-table-wrapper">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Покупатель</th>
-                  <th>Товары</th>
-                  <th>Сумма USD</th>
-                  <th>Статус</th>
-                  <th>Дата</th>
-                </tr>
-              </thead>
-              <tbody>
-                {store.orders.map(o => (
-                  <tr key={o.id}>
-                    <td>#{o.id}</td>
-                    <td>
-                      <strong>{o.user?.name || "Гость"}</strong>
-                      <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-                        {o.user?.username ? `@${o.user.username}` : ""}
-                      </div>
-                    </td>
-                    <td>{o.items}</td>
-                    <td>${o.totalUsd.toLocaleString()}</td>
-                    <td><span className={`status-badge badge-${o.status}`}>{o.status}</span></td>
-                    <td>{o.createdAt}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {adminTab === "users" && (
+        <AdminUsers />
       )}
 
       {adminTab === "stores" && (

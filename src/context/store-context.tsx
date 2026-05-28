@@ -52,6 +52,8 @@ interface StoreContextType {
   setLanguage: (lang: LanguageType) => void;
   currency: "USD" | "KGS";
   setCurrency: (curr: "USD" | "KGS") => void;
+  theme: "dark" | "light";
+  toggleTheme: () => void;
   section: "instock" | "preorder" | "admin";
   setSection: (sec: "instock" | "preorder" | "admin") => void;
   
@@ -102,6 +104,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const [language, setLanguage] = useState<LanguageType>("ru");
   const [currency, setCurrency] = useState<"USD" | "KGS">("USD");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [section, setSection] = useState<"instock" | "preorder" | "admin">("instock");
 
   // Filter States
@@ -362,6 +365,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSection("instock");
   };
 
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    localStorage.setItem("mobilnik-theme", next);
+    document.documentElement.setAttribute("data-theme", next);
+  };
+
+  useEffect(() => {
+    const saved = localStorage.getItem("mobilnik-theme") as "dark" | "light" | null;
+    if (saved) {
+      setTheme(saved);
+      document.documentElement.setAttribute("data-theme", saved);
+    }
+  }, []);
+
   return (
     <StoreContext.Provider
       value={{
@@ -369,6 +387,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setLanguage,
         currency,
         setCurrency,
+        theme,
+        toggleTheme,
         section,
         setSection,
         products,

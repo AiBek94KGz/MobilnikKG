@@ -57,7 +57,7 @@ export default function Storefront() {
   const { data: session } = useSession();
   const store = useStore();
   const dict = locales[store.language];
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
   const [isDbExplorerOpen, setIsDbExplorerOpen] = useState(false);
 
   const isWholesale = session?.user && (
@@ -68,21 +68,6 @@ export default function Storefront() {
   const role = session?.user ? (session.user as any).role : null;
   const isStoreOwner = role === "store_owner";
   const isPlatformAdmin = role === "owner" || role === "admin";
-
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme") as "dark" | "light";
-    if (savedTheme) {
-      setTheme(savedTheme);
-      document.documentElement.setAttribute("data-theme", savedTheme);
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const newTheme = theme === "dark" ? "light" : "dark";
-    setTheme(newTheme);
-    localStorage.setItem("theme", newTheme);
-    document.documentElement.setAttribute("data-theme", newTheme);
-  };
 
   const renderPrice = (usdVal: number) => {
     if (store.currency === "KGS") {
@@ -131,8 +116,8 @@ export default function Storefront() {
           </div>
 
           <div className="controls-group">
-            <button className="icon-btn" onClick={toggleTheme} title="Переключить тему">
-              {theme === "dark" ? (
+            <button className="icon-btn" onClick={store.toggleTheme} title="Переключить тему">
+              {store.theme === "dark" ? (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
               ) : (
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -164,22 +149,35 @@ export default function Storefront() {
           <section className="hero">
             <div className="container">
               <div className="hero-banner">
-                <div className="hero-content">
-                  <div className="hero-brand-badge">
-                    <span>✨</span>
-                    Abdulatif Optom Marketplace
+                <div className="hero-image" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                  <div style={{ marginTop: "-2rem" }}>
+                    <svg width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--text-primary)" }}>
+                      <rect x="5" y="1.5" width="14" height="21" rx="2.5" ry="2.5" fill="var(--card)"></rect>
+                      <path d="M12 18h.01"></path>
+                      <path d="M9 3h6"></path>
+                      <rect x="6.5" y="4.5" width="11" height="12" rx="1" fill="var(--background)" stroke="var(--border)" strokeWidth="0.5"></rect>
+                      <circle cx="12" cy="10" r="2" stroke="var(--text-muted)" strokeWidth="0.5"></circle>
+                      <line x1="8" y1="14" x2="16" y2="14" stroke="var(--text-muted)" strokeWidth="0.5"></line>
+                    </svg>
                   </div>
-                  <h1 className="hero-title">В наличии и под заказ<br/>без лишних переплат.</h1>
-                  <p className="heroSubtitle">{dict.heroSubtitle}</p>
-                  <button className="hero-btn" onClick={() => store.setSection("preorder")}>{dict.preOrderCTA}</button>
+                  <div style={{ 
+                    fontSize: "1.5rem", 
+                    fontWeight: 900, 
+                    textTransform: "uppercase", 
+                    letterSpacing: "2px",
+                    color: "#ffffff",
+                    fontFamily: "'JetBrains Mono', monospace",
+                    textAlign: "center",
+                    marginTop: "-1rem"
+                  }}>
+                    Abdulatif Optom
+                  </div>
                 </div>
-                
-                <div className="hero-visual">
-                  <div className="hero-visual-logo">
-                    <div className="logo-ao">AO</div>
-                    <div className="logo-text">Abdulatif Optom</div>
-                    <div className="logo-cart">🛒</div>
-                  </div>
+
+                <div className="hero-content">
+                  <h1 className="hero-title">В наличии и под заказ<br/>без лишних переплат.</h1>
+                  <p className="hero-subtitle">Оригинальные девайсы по лучшим оптовым и розничным ценам в Бишкеке.</p>
+                  <button className="hero-btn" onClick={() => store.setSection("preorder")}>Заказать из-за рубежа</button>
                 </div>
               </div>
             </div>
@@ -190,19 +188,17 @@ export default function Storefront() {
               <div className="brand-tabs">
                 {(["all", "Apple", "Samsung", "Xiaomi", "Feature Phones"] as const).map(b => (
                   <button key={b} className={`brand-tab ${store.selectedBrand === b ? "active" : ""}`} onClick={() => { store.setSelectedBrand(b); store.setSelectedStatus("all"); }}>
-                    {b === "all" ? dict.brandAll : b}
+                    {b === "all" ? dict.brandAll : (b === "Feature Phones" ? "Другие" : b)}
                   </button>
                 ))}
               </div>
-              {store.selectedBrand !== "all" && (
-                <div className="status-pills">
-                  {(["all", "new", "imported", "promo"] as const).map(s => (
-                    <button key={s} className={`status-pill ${store.selectedStatus === s ? "active" : ""}`} onClick={() => store.setSelectedStatus(s)}>
-                      {s === "all" ? dict.statusAll : (s === "new" ? dict.statusNew : (s === "imported" ? "Б/У" : "Промо"))}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="status-pills">
+                {(["all", "new", "imported", "promo"] as const).map(s => (
+                  <button key={s} className={`status-pill ${store.selectedStatus === s ? "active" : ""}`} onClick={() => store.setSelectedStatus(s)}>
+                    {s === "all" ? dict.statusAll : (s === "new" ? dict.statusNew : (s === "imported" ? "Б/У" : "Промо"))}
+                  </button>
+                ))}
+              </div>
             </div>
           </section>
 

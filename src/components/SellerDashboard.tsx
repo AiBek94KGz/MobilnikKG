@@ -37,7 +37,9 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
   // Staff form states
   const [staffName, setStaffName] = useState("");
   const [staffUsername, setStaffUsername] = useState("");
-  const [staffPhone, setStaffPhone] = useState("");
+  const [staffTelegramId, setStaffTelegramId] = useState("");
+  const [staffEmail, setStaffEmail] = useState("");
+  const [staffPassword, setStaffPassword] = useState("");
   const [isSubmittingStaff, setIsSubmittingStaff] = useState(false);
 
   // Profile settings states
@@ -155,8 +157,8 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
 
   const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!staffName.trim() || !staffUsername.trim()) {
-      alert("Заполните имя и юзернейм.");
+    if (!staffName.trim() || (!staffUsername.trim() && !staffTelegramId.trim())) {
+      alert("Заполните имя и хотя бы Username или Telegram ID.");
       return;
     }
     setIsSubmittingStaff(true);
@@ -166,8 +168,10 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: staffName.trim(),
-          username: staffUsername.trim(),
-          phone: staffPhone.trim() || null,
+          username: staffUsername.trim() || null,
+          telegramId: staffTelegramId.trim() || null,
+          email: staffEmail.trim() || null,
+          password: staffPassword.trim() || null,
         }),
       });
 
@@ -175,7 +179,9 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
         alert("Сотрудник успешно добавлен!");
         setStaffName("");
         setStaffUsername("");
-        setStaffPhone("");
+        setStaffTelegramId("");
+        setStaffEmail("");
+        setStaffPassword("");
         fetchMyStaff();
       } else {
         const data = await res.json();
@@ -456,7 +462,7 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
                   <option value="Apple">Apple</option>
                   <option value="Samsung">Samsung</option>
                   <option value="Xiaomi">Xiaomi</option>
-                  <option value="Feature Phones">Кнопочные</option>
+                  <option value="Feature Phones">Другие</option>
                 </select>
               </div>
               <div className="form-group">
@@ -529,7 +535,7 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
       )}
 
       {lkTab === "staff" && (
-        <div className="admin-grid" style={{ gridTemplateColumns: "2.5fr 1fr" }}>
+        <div className="admin-grid" style={{ gridTemplateColumns: "2fr 1.2fr" }}>
           {/* Staff List */}
           <div className="admin-card">
             <h3>Штат сотрудников</h3>
@@ -538,7 +544,7 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
                 <thead>
                   <tr>
                     <th>Имя</th>
-                    <th>@Username</th>
+                    <th>Telegram ID / @Username</th>
                     <th>Действия</th>
                   </tr>
                 </thead>
@@ -546,7 +552,10 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
                   {myStaff.map((s) => (
                     <tr key={s.id}>
                       <td><strong>{s.name}</strong></td>
-                      <td>@{s.username}</td>
+                      <td>
+                        <div style={{ fontSize: "0.85rem" }}>ID: <code>{s.telegramId || "—"}</code></div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>@{s.username}</div>
+                      </td>
                       <td>
                         <button className="qty-btn" style={{ color: "var(--danger)", borderColor: "var(--danger)" }} onClick={() => handleDeleteStaff(s.id)}>Уволить</button>
                       </td>
@@ -563,13 +572,32 @@ export function SellerDashboard({ dict }: SellerDashboardProps) {
             <form onSubmit={handleAddStaff}>
               <div className="form-group">
                 <label>Имя сотрудника</label>
-                <input type="text" className="form-input" value={staffName} onChange={(e) => setStaffName(e.target.value)} required />
+                <input type="text" className="form-input" placeholder="Иван Иванов" value={staffName} onChange={(e) => setStaffName(e.target.value)} required />
               </div>
+              
               <div className="form-group">
-                <label>Username Telegram</label>
-                <input type="text" className="form-input" value={staffUsername} onChange={(e) => setStaffUsername(e.target.value)} required />
+                <label>Telegram ID (Числовой)</label>
+                <input type="text" className="form-input" placeholder="Напр. 5775694173" value={staffTelegramId} onChange={(e) => setStaffTelegramId(e.target.value)} />
+                <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Для входа через бота</span>
               </div>
-              <button type="submit" className="btn-submit" disabled={isSubmittingStaff}>Добавить</button>
+
+              <div style={{ borderTop: "1px dashed var(--border)", margin: "1rem 0", paddingTop: "1rem" }}>
+                <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "0.5rem", textTransform: "uppercase" }}>Вход по паролю (опционально):</p>
+                <div className="form-group">
+                  <label>Логин / Username</label>
+                  <input type="text" className="form-input" placeholder="ivan_staff" value={staffUsername} onChange={(e) => setStaffUsername(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>Пароль</label>
+                  <input type="password" className="form-input" placeholder="******" value={staffPassword} onChange={(e) => setStaffPassword(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label>Email (необязательно)</label>
+                  <input type="email" className="form-input" placeholder="ivan@example.com" value={staffEmail} onChange={(e) => setStaffEmail(e.target.value)} />
+                </div>
+              </div>
+
+              <button type="submit" className="btn-submit" disabled={isSubmittingStaff}>Добавить в штат</button>
             </form>
           </div>
         </div>

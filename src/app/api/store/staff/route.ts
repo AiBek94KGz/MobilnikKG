@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import bcrypt from "bcryptjs";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -19,7 +20,15 @@ export async function GET() {
   try {
     const parentId = parseInt((session.user as any).id, 10);
     const staffList = await db
-      .select()
+      .select({
+        id: users.id,
+        name: users.name,
+        username: users.username,
+        telegramId: users.telegramId,
+        phone: users.phone,
+        email: users.email,
+        createdAt: users.createdAt,
+      })
       .from(users)
       .where(eq(users.parentId, parentId));
 
@@ -43,32 +52,38 @@ export async function POST(request: Request) {
 
   try {
     const parentId = parseInt((session.user as any).id, 10);
-    const { name, username, phone } = await request.json();
+    const { name, username, password, telegramId, email, phone } = await request.json();
 
-    if (!name || !username) {
-      return NextResponse.json({ error: "Name and username are required" }, { status: 400 });
+    if (!name || (!username && !telegramId)) {
+      return NextResponse.json({ error: "Name and at least Username or Telegram ID are required" }, { status: 400 });
     }
 
-    const cleanUsername = username.trim().replace("@", "");
+    const cleanUsername = username ? username.trim().replace("@", "") : null;
+    const cleanTgId = telegramId ? telegramId.toString().trim() : null;
 
-    // Check if username already exists
-    const exists = await db
-      .select()
-      .from(users)
-      .where(eq(users.username, cleanUsername))
-      .limit(1);
-
-    if (exists[0]) {
-      return NextResponse.json({ error: "Username already exists" }, { status: 400 });
+    // Check for collisions
+    if (cleanUsername) {
+      const exists = await db.select().from(users).where(eq(users.username, cleanUsername)).limit(1);
+      if (exists[0]) return NextResponse.json({ error: "Username already exists" }, { status: 400 });
     }
+    
+    if (cleanTgId) {
+      const exists = await db.select().from(users).where(eq(users.telegramId, cleanTgId)).limit(1);
+      if (exists[0]) return NextResponse.json({ error: "Telegram ID already associated with another account" }, { status: 400 });
+    }
+
+    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
     const inserted = await db.insert(users).values({
       name: name.trim(),
-      username: cleanUsername,
+      username: cleanUsername || `staff_${cleanTgId}`,
+      telegramId: cleanTgId,
+      email: email ? email.trim() : null,
+      password: hashedPassword,
       phone: phone ? phone.trim() : null,
       role: "store_staff",
       parentId: parentId,
-      userIndex: `S_${cleanUsername}`,
+      userIndex: `S_${cleanUsername || cleanTgId}`,
     }).returning({ id: users.id });
 
     return NextResponse.json({ success: true, staffId: inserted[0].id });
