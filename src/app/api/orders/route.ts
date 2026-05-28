@@ -23,7 +23,26 @@ export async function GET() {
   }
 
   try {
-    let query = db
+    let whereClause: any = undefined;
+
+    if (role === "store_owner" && userId) {
+      // Find stores owned by this user
+      const userStores = await db.select({ id: stores.id }).from(stores).where(eq(stores.ownerId, userId));
+      const storeIds = userStores.map(s => s.id);
+      
+      if (storeIds.length === 0) {
+        return NextResponse.json({ orders: [] });
+      }
+
+      const orderIdsSubquery = db.select({ orderId: orderItems.orderId })
+        .from(orderItems)
+        .leftJoin(products, eq(orderItems.productId, products.id))
+        .where(inArray(products.storeId, storeIds));
+      
+      whereClause = inArray(orders.id, orderIdsSubquery);
+    }
+
+    const list = await db
       .select({
         id: orders.id,
         totalUsd: orders.totalUsd,
@@ -44,26 +63,9 @@ export async function GET() {
       .from(orders)
       .leftJoin(users, eq(orders.userId, users.id))
       .leftJoin(orderItems, eq(orders.id, orderItems.orderId))
-      .leftJoin(products, eq(orderItems.productId, products.id));
-
-    if (role === "store_owner" && userId) {
-      // Find stores owned by this user
-      const userStores = await db.select({ id: stores.id }).from(stores).where(eq(stores.ownerId, userId));
-      const storeIds = userStores.map(s => s.id);
-      
-      if (storeIds.length === 0) {
-        return NextResponse.json({ orders: [] });
-      }
-
-      const orderIdsSubquery = db.select({ orderId: orderItems.orderId })
-        .from(orderItems)
-        .leftJoin(products, eq(orderItems.productId, products.id))
-        .where(inArray(products.storeId, storeIds));
-      
-      query = query.where(inArray(orders.id, orderIdsSubquery));
-    }
-
-    const list = await query.orderBy(desc(orders.id));
+      .leftJoin(products, eq(orderItems.productId, products.id))
+      .where(whereClause)
+      .orderBy(desc(orders.id));
 
     const orderMap = new Map<number, any>();
     for (const row of list) {
