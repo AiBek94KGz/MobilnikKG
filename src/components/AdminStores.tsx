@@ -24,7 +24,7 @@ export function AdminStores({ dict }: AdminStoresProps) {
   const fetchStores = async () => {
     setIsLoadingStores(true);
     try {
-      const res = await fetch("/api/admin/stores");
+      const res = await fetch(`/api/admin/stores?t=${Date.now()}`);
       const d = await res.json();
       if (d.success) setAdminStores(d.stores);
     } catch (err) {

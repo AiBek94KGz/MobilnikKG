@@ -29,18 +29,26 @@ export async function GET(request: Request) {
       .from(stores)
       .leftJoin(users, eq(stores.ownerId, users.id));
 
-    // 2. Get product counts separately to avoid complex join issues
-    const productCounts = await db
-      .select({
-        storeId: products.storeId,
-        count: sql<number>`count(*)`,
-      })
-      .from(products)
-      .groupBy(products.storeId);
+    console.log("Raw stores from DB:", JSON.stringify(allStores));
+
+    // 2. Get product counts separately
+    let productCounts: any[] = [];
+    try {
+      productCounts = await db
+        .select({
+          storeId: products.storeId,
+          count: sql<number>`count(*)`,
+        })
+        .from(products)
+        .groupBy(products.storeId);
+      console.log("Product counts:", JSON.stringify(productCounts));
+    } catch (e) {
+      console.error("Error fetching product counts:", e);
+    }
 
     // 3. Merge data
     const formattedStores = allStores.map((s) => {
-      const matched = productCounts.find((pc) => pc.storeId === s.id);
+      const matched = productCounts.find((pc) => pc.storeId == s.id);
       return {
         ...s,
         productCount: matched ? Number(matched.count) : 0,
