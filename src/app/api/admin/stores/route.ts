@@ -10,8 +10,8 @@ export async function GET(request: Request) {
     const { authorized, response } = await validateSession(["owner", "admin"]);
     if (!authorized) return response;
 
-    // Join stores with users (owners)
-    const list = await db
+    // 1. Get all stores with owner info
+    const allStores = await db
       .select({
         id: stores.id,
         name: stores.name,
@@ -20,16 +20,16 @@ export async function GET(request: Request) {
         logoUrl: stores.logoUrl,
         status: stores.status,
         createdAt: stores.createdAt,
+        ownerId: stores.ownerId,
         ownerName: users.name,
         ownerUsername: users.username,
         ownerEmail: users.email,
         ownerPhone: users.phone,
-        ownerId: users.id,
       })
       .from(stores)
       .leftJoin(users, eq(stores.ownerId, users.id));
 
-    // Count products per store
+    // 2. Get product counts separately to avoid complex join issues
     const productCounts = await db
       .select({
         storeId: products.storeId,
@@ -38,14 +38,16 @@ export async function GET(request: Request) {
       .from(products)
       .groupBy(products.storeId);
 
-    const formattedStores = list.map((s) => {
+    // 3. Merge data
+    const formattedStores = allStores.map((s) => {
       const matched = productCounts.find((pc) => pc.storeId === s.id);
       return {
         ...s,
-        productCount: matched ? matched.count : 0,
+        productCount: matched ? Number(matched.count) : 0,
       };
     });
 
+    console.log(`Successfully fetched ${formattedStores.length} stores`);
     return NextResponse.json({ success: true, stores: formattedStores });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || "Internal server error" }, { status: 500 });
